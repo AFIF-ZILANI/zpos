@@ -1,0 +1,21 @@
+FROM oven/bun:latest AS builder
+
+WORKDIR /app
+
+COPY package.json bun.lockb* ./
+RUN bun install --frozen-lockfile
+
+COPY . .
+
+# Optional: compile to single binary
+RUN bun build ./src/index.ts --compile --outfile server
+
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/server .
+
+EXPOSE 3000
+
+CMD ["./server"]

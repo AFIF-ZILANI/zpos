@@ -1,0 +1,1 @@
+export const GS1_COMPANY_PREFIX = "2001"

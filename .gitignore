@@ -1,0 +1,59 @@
+# ── Dependencies ──────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── Build Output ──────────────────────────────────────────
+dist/
+dist-ssr/
+out/
+build/
+*.tgz
+
+# ── Environment Variables ─────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Prisma ────────────────────────────────────────────────
+/generated/prisma
+
+# ── Logs ──────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+bun-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# ── Cache & Coverage ──────────────────────────────────────
+.cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+coverage/
+*.lcov
+
+# ── OS ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor ────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── Misc ──────────────────────────────────────────────────
+*.local
+*.tgz

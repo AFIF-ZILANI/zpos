@@ -1,0 +1,448 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  STAFF
+}
+
+enum SaleStatus {
+  COMPLETED
+  VOID
+}
+
+enum PaymentMethod {
+  CASH
+  BKASH
+  NAGAD
+  ROCKET
+}
+
+// PAID     → sum(payments.amount) >= sale.total
+// PARTIAL  → 0 < sum < total
+// DUE      → sum == 0
+// WAIVED   → sale has waived_amount covering the gap (still unpaid in cash)
+// Compute this in application; do not persist it.
+enum StockMovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+}
+
+enum StockDirection {
+  IN
+  OUT
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Users
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String  @id @default(uuid())
+  name          String?
+  email         String  @unique
+  password_hash String
+  refresh_token String?
+  phone         String? @unique
+  role          Role    @default(OWNER)
+  is_active     Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  sales             Sale[]
+  purchases         Purchase[]
+  stockAdjustments  StockAdjustment[]
+  barcodesRetired   Barcode[]                  @relation("BarcodeRetirer")
+  barcodesAllocated VariantBarcodeAllocation[] @relation("BarcodeAllocator")
+
+  @@index([email])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customers
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Customer {
+  id             String  @id @default(uuid())
+  name           String?
+  phone          String? @unique
+  email          String?
+  address        String?
+  credit_balance Decimal @default(0) @db.Decimal(10, 2)
+  is_active      Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  sales Sale[]
+
+  @@index([phone])
+  @@map("customers")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Products & Variants
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  parent_id   String?
+  is_active   Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parent_id], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+
+  @@index([parent_id])
+  @@map("categories")
+}
+
+model Product {
+  id              String  @id @default(uuid())
+  name            String
+  normalized_key  String // lowercased+stripped for duplicate detection
+  description     String?
+  category_id     String
+  brand           String?
+  reorder_level   Int     @default(0)
+  is_active       Boolean @default(true)
+  base_variant_id String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  category Category         @relation(fields: [category_id], references: [id])
+  variants ProductVariant[]
+
+  @@index([category_id])
+  @@index([normalized_key])
+  @@map("products")
+}
+
+model ProductVariant {
+  id         String  @id @default(uuid())
+  product_id String
+  name       String? // e.g. "Red / XL" — null if product has only one variant
+  color      String?
+  size       String?
+  is_active  Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  product Product @relation(fields: [product_id], references: [id])
+
+  saleItems                 SaleItem[]
+  purchaseItems             PurchaseItem[]
+  stockAdjustmentItems      StockAdjustmentItem[]
+  stockLedgers              StockLedger[]
+  variantBarcodeAllocations VariantBarcodeAllocation[]
+
+  @@index([product_id])
+  @@map("product_variants")
+}
+
+enum BarcodeStatus {
+  UNALLOCATED // sitting in the drawer, ready to use
+  ALLOCATED // assigned to a product variant
+  RETIRED // sticker damaged, duplicate scan, decommissioned
+}
+
+model Barcode {
+  id     String        @id @default(uuid())
+  code   String        @unique
+  serial Int           @default(autoincrement())
+  status BarcodeStatus @default(UNALLOCATED)
+
+  retired_by String?
+  retired_at DateTime?
+
+  created_at DateTime @default(now())
+
+  retiredByUser User?                     @relation("BarcodeRetirer", fields: [retired_by], references: [id])
+  allocation    VariantBarcodeAllocation? // null until allocated
+
+  @@index([code])
+  @@index([status])
+  @@index([serial])
+  @@map("barcodes")
+}
+
+// The join table — barcode + variant + purchase batch
+model VariantBarcodeAllocation {
+  id String @id @default(uuid())
+
+  barcode_id       String @unique // one barcode → one allocation at a time
+  variant_id       String
+  purchase_item_id String // which purchase batch this unit came from
+
+  allocated_by String
+  allocated_at DateTime @default(now())
+
+  barcode         Barcode        @relation(fields: [barcode_id], references: [id])
+  variant         ProductVariant @relation(fields: [variant_id], references: [id])
+  purchaseItem    PurchaseItem   @relation(fields: [purchase_item_id], references: [id])
+  allocatedByUser User           @relation("BarcodeAllocator", fields: [allocated_by], references: [id])
+
+  @@index([barcode_id])
+  @@index([variant_id])
+  @@index([purchase_item_id])
+  @@map("variant_barcode_allocations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Purchasing
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Supplier {
+  id    String  @id @default(uuid())
+  name  String
+  phone String? @unique
+  email String? @unique
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  purchases Purchase[]
+
+  @@map("suppliers")
+}
+
+model Purchase {
+  id          String  @id @default(uuid())
+  supplier_id String?
+  user_id     String
+
+  total      Decimal @db.Decimal(10, 2)
+  note       String?
+  invoice_no String?
+
+  date       DateTime
+  created_at DateTime @default(now())
+
+  supplier Supplier? @relation(fields: [supplier_id], references: [id])
+  user     User      @relation(fields: [user_id], references: [id])
+
+  items        PurchaseItem[]
+  stockLedgers StockLedger[]
+
+  @@index([supplier_id])
+  @@index([user_id])
+  @@index([invoice_no])
+  @@index([created_at])
+  @@index([date])
+  @@index([date, invoice_no])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id          String @id @default(uuid())
+  purchase_id String
+  variant_id  String
+
+  quantity   Int
+  cost_price Decimal @db.Decimal(10, 2) // price at time of purchase (snapshot)
+  sell_price Decimal @db.Decimal(10, 2) // price at time of purchase (snapshot)
+  total      Decimal @db.Decimal(10, 2)
+
+  purchase                  Purchase                   @relation(fields: [purchase_id], references: [id])
+  variant                   ProductVariant             @relation(fields: [variant_id], references: [id])
+  variantBarcodeAllocations VariantBarcodeAllocation[]
+
+  @@index([purchase_id])
+  @@index([variant_id])
+  @@index([purchase_id, variant_id])
+  @@map("purchase_items")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Invoice Counter  (use SELECT ... FOR UPDATE or atomic increment only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Counter {
+  key   String @id // e.g. "invoice"
+  value Int
+
+  @@map("counters")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sales
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Sale {
+  id             String     @id @default(uuid())
+  user_id        String
+  customer_id    String?
+  invoice_number String     @unique
+  invoiced_at    DateTime
+  status         SaleStatus @default(COMPLETED)
+
+  subtotal        Decimal @db.Decimal(10, 2)
+  discount_amount Decimal @default(0) @db.Decimal(10, 2)
+  tax_amount      Decimal @default(0) @db.Decimal(10, 2)
+  waived_amount   Decimal @default(0) @db.Decimal(10, 2)
+  total           Decimal @db.Decimal(10, 2)
+
+  note String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user     User      @relation(fields: [user_id], references: [id])
+  customer Customer? @relation(fields: [customer_id], references: [id])
+
+  items        SaleItem[]
+  payments     Payment[]
+  stockLedgers StockLedger[]
+
+  @@index([user_id])
+  @@index([customer_id])
+  @@index([invoiced_at])
+  @@index([status])
+  @@index([invoice_number])
+  @@index([invoiced_at, status])
+  @@map("sales")
+}
+
+model SaleItem {
+  id         String @id @default(uuid())
+  sale_id    String
+  variant_id String
+
+  // Denormalized snapshots — intentional, prices change over time
+  product_name String
+  variant_name String?
+  unit_price   Decimal @db.Decimal(10, 2)
+
+  quantity        Int
+  discount_amount Decimal @default(0) @db.Decimal(10, 2)
+  total           Decimal @db.Decimal(10, 2)
+
+  sale    Sale           @relation(fields: [sale_id], references: [id])
+  variant ProductVariant @relation(fields: [variant_id], references: [id])
+
+  @@index([sale_id])
+  @@index([variant_id])
+  @@map("sale_items")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Payments
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Payment {
+  id      String @id @default(uuid())
+  sale_id String
+
+  method    PaymentMethod
+  amount    Decimal       @db.Decimal(10, 2)
+  reference String? // bKash TrxID,  auth code, etc.
+
+  created_at DateTime @default(now())
+
+  sale Sale @relation(fields: [sale_id], references: [id])
+
+  @@index([sale_id])
+  @@index([method])
+  @@index([created_at])
+  @@index([method, created_at])
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stock Ledger  (append-only — never UPDATE or DELETE rows)
+// WARNING: balance_after is only consistent if variant stock writes are
+// serialized per-variant (e.g. SELECT ... FOR UPDATE on the variant row).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model StockLedger {
+  id         String @id @default(uuid())
+  variant_id String
+
+  type          StockMovementType
+  direction     StockDirection
+  quantity      Int
+  balance_after Int
+
+  // Exactly one non-null per row
+  sale_id       String?
+  purchase_id   String?
+  adjustment_id String?
+
+  created_at DateTime @default(now())
+
+  variant    ProductVariant   @relation(fields: [variant_id], references: [id])
+  sale       Sale?            @relation(fields: [sale_id], references: [id])
+  purchase   Purchase?        @relation(fields: [purchase_id], references: [id])
+  adjustment StockAdjustment? @relation(fields: [adjustment_id], references: [id])
+
+  @@index([variant_id])
+  @@index([variant_id, created_at])
+  @@index([sale_id])
+  @@index([purchase_id])
+  @@index([adjustment_id])
+  @@map("stock_ledgers")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stock Adjustments
+// ─────────────────────────────────────────────────────────────────────────────
+
+model StockAdjustment {
+  id          String  @id @default(uuid())
+  adjusted_by String
+  reason      String?
+  note        String?
+
+  created_at DateTime @default(now())
+
+  adjustedByUser User @relation(fields: [adjusted_by], references: [id])
+
+  items        StockAdjustmentItem[]
+  stockLedgers StockLedger[]
+
+  @@index([adjusted_by])
+  @@map("stock_adjustments")
+}
+
+model StockAdjustmentItem {
+  id            String @id @default(uuid())
+  adjustment_id String
+  variant_id    String
+
+  direction StockDirection
+  quantity  Int
+  note      String?
+
+  adjustment StockAdjustment @relation(fields: [adjustment_id], references: [id])
+  variant    ProductVariant  @relation(fields: [variant_id], references: [id])
+
+  @@index([adjustment_id])
+  @@index([variant_id])
+  @@map("stock_adjustment_items")
+}

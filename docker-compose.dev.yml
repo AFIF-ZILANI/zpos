@@ -1,0 +1,45 @@
+version: "3.9"
+
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    container_name: server-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./server:/app # hot reload via volume mount
+      - /app/node_modules # prevent overwriting node_modules
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    container_name: client-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app # hot reload via volume mount
+      - /app/node_modules
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:3000
+    networks:
+      - app-network
+    depends_on:
+      - server
+    restart: unless-stopped
