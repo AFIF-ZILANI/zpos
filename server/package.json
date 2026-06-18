@@ -20,10 +20,10 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@myapp/shared": "workspace:*",
     "@clerk/backend": "^3.4.2",
     "@hono/clerk-auth": "^3.1.1",
     "@hono/zod-validator": "^0.7.6",
+    "@myapp/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "bcryptjs": "^3.0.3",
@@ -33,11 +33,18 @@
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.20.0",
     "prisma": "^7.5.0",
+    "resend": "^6.12.2",
     "zod": "^4.3.6"
   },
   "bun": {
     "alias": {
       "@": "./src"
     }
+  },
+  "prisma": {
+    "binaryTargets": [
+      "native",
+      "debian-openssl-3.0.x"
+    ]
   }
 }

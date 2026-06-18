@@ -1,4 +1,4 @@
-version: "3.9"
+# version: "3.9"
 
 networks:
   app-network:
@@ -7,22 +7,32 @@ networks:
 services:
   server:
     build:
-      context: ./server
-      dockerfile: Dockerfile.prod
-    container_name: pos-server
+      context: .
+      dockerfile: server/Dockerfile.prod
+    container_name: pos-server-prod
     ports:
       - "3000:3000"
     env_file:
       - ./server/.env
+    environment:
+      - NODE_ENV=production
+    networks:
+      - app-network
     restart: always
 
   client:
     build:
-      context: ./client
-      dockerfile: Dockerfile.prod
-    container_name: pos-client
+      context: .
+      dockerfile: client/Dockerfile.prod
+    container_name: pos-client-prod
     ports:
       - "80:80"
     env_file:
       - ./client/.env
+    environment:
+      - NODE_ENV=production
+    networks:
+      - app-network
+    depends_on:
+      - server
     restart: always

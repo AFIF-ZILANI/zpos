@@ -2,19 +2,33 @@ FROM oven/bun:latest AS builder
 
 WORKDIR /app
 
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock ./
+
+# Copy ALL workspaces
+COPY server/ ./server/
+COPY client/ ./client/
+COPY packages/ ./packages/
+
 RUN bun install --frozen-lockfile
 
-COPY . .
+# Generate Prisma client
+WORKDIR /app/server
+RUN bunx prisma generate
 
-# Optional: compile to single binary
-RUN bun build ./src/index.ts --compile --outfile server
+# Build single binary
+RUN bun build ./index.ts --compile --outfile dist/server
 
+# ---- Runtime image ----
 FROM debian:bookworm-slim
 
 WORKDIR /app
 
-COPY --from=builder /app/server .
+# Copy compiled binary
+COPY --from=builder /app/server/dist/server .
+
+# Copy prisma generated client (needed at runtime)
+COPY --from=builder /app/server/generated ./generated
+COPY --from=builder /app/server/prisma ./prisma
 
 EXPOSE 3000
 

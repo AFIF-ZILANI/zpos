@@ -1,0 +1,1 @@
+{"nodes": [{"id": "migrations_20260426172513_init_paymentstatus_enum", "label": "PaymentStatus Enum (PAID,DUE,PARTIAL,REFUNDED)", "file_type": "sql", "source_file": "server/prisma/migrations/20260426172513_init/migration.sql", "source_location": "line 9", "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

@@ -2,10 +2,16 @@ FROM oven/bun:latest
 
 WORKDIR /app
 
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock ./
+
+# Copy ALL workspaces (bun needs all of them to resolve)
+COPY server/ ./server/
+COPY client/ ./client/
+COPY packages/ ./packages/
+
 RUN bun install
 
-COPY . .
+WORKDIR /app/client
 
 EXPOSE 5173
 

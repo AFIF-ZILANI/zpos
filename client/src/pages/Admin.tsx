@@ -39,27 +39,20 @@ import {
   Trash2,
   ShieldCheck,
   Mail,
-  Clock,
   Users,
   Search,
-  MoreHorizontal,
   Edit2,
   CheckCircle2,
   AlertCircle,
+  XCircle,
 } from "lucide-react";
-
-type AdminUser = {
-  id: string;
-  name: string | null;
-  email: string;
-  role: "OWNER" | "STAFF";
-  is_active: boolean;
-  created_at: string;
-};
+import type { Admin } from "@/types";
+import { Spinner } from "@/components/ui/spinner";
 
 type PendingInvitation = {
   id: string;
   email: string;
+  status: "PENDING" | "CANCELLED";
   role: "OWNER" | "STAFF";
   created_at: string;
   expires_at: string;
@@ -68,7 +61,7 @@ type PendingInvitation = {
 export default function AdminPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
+  const [editingUser, setEditingUser] = useState<Admin | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<"OWNER" | "STAFF">("STAFF");
@@ -78,16 +71,16 @@ export default function AdminPage() {
     null,
   );
 
-  const { data, refetch } = useGetData<{ items: AdminUser[] }>("/admin");
+  const { data, refetch } = useGetData<{ data: { items: Admin[] } }>("/admin");
   const { data: invitesData, refetch: refetchInvites } = useGetData<{
-    items: PendingInvitation[];
+    data: { items: PendingInvitation[] };
   }>("/admin/invites");
 
-  const users = data?.items ?? [];
-  const pendingInvites = invitesData?.items ?? [];
+  const users = data?.data?.items ?? [];
+  const pendingInvites = invitesData?.data?.items ?? [];
 
   const { mutate: invite, isPending: inviting } = usePostData("/admin/invite");
-  const { mutate: update } = usePatchData("/admin");
+  const { mutate: update, isPending: updating } = usePatchData("/admin");
   const { mutate: cancelInvite } = useDeleteData("/admin/invites");
 
   const handleInvite = () => {
@@ -137,20 +130,20 @@ export default function AdminPage() {
     );
   };
 
-  const changeRole = (user: AdminUser, newRole: "OWNER" | "STAFF") => {
-    update(
-      { id: user.id, role: newRole },
-      {
-        onSuccess: () => {
-          toast.success("Role updated successfully");
-          refetch();
-        },
-        onError: (err) => toast.error(err.message),
-      },
-    );
-  };
+  // const changeRole = (user: Admin, newRole: "OWNER" | "STAFF") => {
+  //   update(
+  //     { id: user.id, role: newRole },
+  //     {
+  //       onSuccess: () => {
+  //         toast.success("Role updated successfully");
+  //         refetch();
+  //       },
+  //       onError: (err) => toast.error(err.message),
+  //     },
+  //   );
+  // };
 
-  const handleEditUser = (user: AdminUser) => {
+  const handleEditUser = (user: Admin) => {
     setEditingUser(user);
     setName(user.name || "");
     setRole(user.role);
@@ -189,7 +182,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
-        <div className="border-b border-border bg-gradient-to-b from-background via-background to-muted/40 px-6 py-8">
+        <div className="border-b border-border bg-linear-to-b from-background via-background to-muted/40 px-6 py-8">
           <div className="flex items-center justify-between">
             <div className="space-y-3">
               <div className="flex items-center gap-4">
@@ -285,7 +278,7 @@ export default function AdminPage() {
                           >
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground text-sm font-semibold">
+                                <div className="h-10 w-10 rounded-full bg-linear-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground text-sm font-semibold">
                                   {user.name?.[0]?.toUpperCase() ??
                                     user.email[0].toUpperCase()}
                                 </div>
@@ -411,18 +404,32 @@ export default function AdminPage() {
                             </td>
                             <td className="px-6 py-4">
                               <p className="text-sm text-muted-foreground">
-                                {new Date(
-                                  invite.created_at,
-                                ).toLocaleDateString()}
+                                {new Date(invite.created_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "2-digit",
+                                    year: "numeric",
+                                  },
+                                )}
                               </p>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4 text-chart-3" />
-                                <span className="text-sm font-medium text-chart-3">
-                                  Pending
-                                </span>
-                              </div>
+                              {invite.status === "PENDING" ? (
+                                <div className="flex items-center gap-2">
+                                  <AlertCircle className="w-4 h-4 text-chart-3" />
+                                  <span className="text-sm font-medium text-chart-3">
+                                    Pending
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <XCircle className="w-4 h-4 text-destructive" />
+                                  <span className="text-sm font-medium text-destructive">
+                                    Cancelled
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex items-center justify-end">
@@ -591,7 +598,12 @@ export default function AdminPage() {
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveEdit}>Save Changes</Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={!name || !role || updating}
+            >
+              {updating ? <Spinner /> : "Save Changes"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

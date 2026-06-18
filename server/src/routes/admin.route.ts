@@ -12,7 +12,9 @@ router.use("*", requireRole("OWNER"));
 
 router.get("/", AdminController.getAll);
 router.post("/invite", validate(inviteSchema), AdminController.invite);
-router.patch("/:id", validate(updateSchema), AdminController.update);
+router.delete("/invites", AdminController.cancelInvite);
+router.get("/invites", AdminController.getInvites);
+router.patch("/", validate(updateSchema), AdminController.update);
 router.delete("/:id", AdminController.remove);
 
 export default router;

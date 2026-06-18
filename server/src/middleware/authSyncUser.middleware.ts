@@ -22,7 +22,7 @@ export async function syncUser(c: Context<AppEnv>, next: Next) {
         // Check if this email is pre-approved in your DB
         const user = await prisma.user.findUnique({
             where: { email },
-            select: { id: true, role: true, is_active: true },
+            select: { id: true, role: true, is_active: true, status: true },
         });
 
         // Not in DB = not invited = blocked
@@ -49,6 +49,7 @@ export async function syncUser(c: Context<AppEnv>, next: Next) {
         await prisma.user.update({
             where: { id: user.id },
             data: {
+                status: user?.status === "PENDING" ? "ACCEPTED" : user?.status,
                 name: [clerkUser.firstName, clerkUser.lastName]
                     .filter(Boolean)
                     .join(" ") || undefined,

@@ -1,5 +1,9 @@
-import { Role } from "generated/prisma";
 import { z } from "zod";
+
+enum Role {
+    OWNER = "OWNER",
+    STAFF = "STAFF",
+}
 
 // ─── Reusable primitives ────────────────────────────────────────────────────
 

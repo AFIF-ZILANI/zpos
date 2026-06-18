@@ -150,7 +150,7 @@ export default function SalesPage() {
     historyPage.toString(),
   ]);
 
-  const stats = statsData?.data || {
+  const stats: SaleMetrics = statsData?.data || {
     totalRevenue: { value: 0, trend: { isPositive: false, delta: 0 } },
     totalSales: { value: 0, trend: { isPositive: false, delta: 0 } },
     uncollectedRevenue: { value: 0, trend: { isPositive: false, delta: 0 } },
@@ -158,8 +158,6 @@ export default function SalesPage() {
   };
   const urgent = urgentData?.data.data || [];
   const historyItems = historyData?.data.data || [];
-
-  console.log(urgentData);
 
   // Mutations
 

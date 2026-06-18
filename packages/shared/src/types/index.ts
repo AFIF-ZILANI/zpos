@@ -160,8 +160,8 @@ export type StatsItem = {
 export interface SaleMetrics {
     totalRevenue: StatsItem;
     totalSales: StatsItem;
-    unpaidSales: StatsItem;
-    totalReturns: StatsItem;
+    uncollectedRevenue: StatsItem;
+    voidedSales: StatsItem;
 }
 
 
@@ -484,4 +484,19 @@ export interface PaymentPayload {
 
 export interface DeletePayload {
     reason?: string
+}
+
+
+type Role = "OWNER" | "STAFF"
+type InviteStatus = "ACCEPTED" | "PENDING" | "CANCELLED"
+
+export type Admin = {
+    id: string
+    name: string
+    email: string
+    role: Role
+    status: InviteStatus
+    is_active: boolean
+    created_at: string
+
 }

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "lib_prisma_prisma", "label": "prisma (PrismaClient singleton)", "file_type": "code", "source_file": "server/src/lib/prisma.ts", "source_location": "line 16", "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

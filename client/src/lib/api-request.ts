@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/react";
 import { useQuery, useMutation, type UseQueryOptions } from "@tanstack/react-query";
 
+
 /**
  * A small helper that wraps fetch with JSON parsing + error handling.
  */
@@ -13,8 +14,9 @@ import { useQuery, useMutation, type UseQueryOptions } from "@tanstack/react-que
 // export const server_URI = "http://localhost:3000/api";
 
 
-export const server_URI = import.meta.env.VITE_API_URL;
+// export const server_URI = import.meta.env.VITE_API_URL;
 
+export const server_URI = "http://localhost:3000/api";
 
 
 // If you use a custom fetch hook, grab the token like this:

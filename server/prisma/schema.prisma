@@ -49,19 +49,24 @@ enum StockDirection {
   OUT
 }
 
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Users
 // ─────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String  @id @default(uuid())
-  name          String?
-  email         String  @unique
-  password_hash String
-  refresh_token String?
-  phone         String? @unique
-  role          Role    @default(OWNER)
-  is_active     Boolean @default(true)
+  id        String       @id @default(uuid())
+  name      String?
+  email     String       @unique
+  phone     String?      @unique
+  status    InviteStatus @default(PENDING)
+  role      Role         @default(OWNER)
+  is_active Boolean      @default(true)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
