@@ -45,10 +45,11 @@ export async function syncUser(c: Context<AppEnv>, next: Next) {
             );
         }
 
-        // Sync name from Clerk in case it changed
+        // Sync name + clerk_id from Clerk in case they changed
         await prisma.user.update({
             where: { id: user.id },
             data: {
+                clerk_id: clerkUserId,
                 status: user?.status === "PENDING" ? "ACCEPTED" : user?.status,
                 name: [clerkUser.firstName, clerkUser.lastName]
                     .filter(Boolean)
