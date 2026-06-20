@@ -683,9 +683,6 @@ export const SaleController = {
         const totalPages = Math.ceil(totalCount / limitNum);
 
 
-        console.log(rows)
-
-
         const sales = rows.map((row) => ({
             id: row.id,
             invoiceNumber: row.invoice_number,
@@ -722,8 +719,6 @@ export const SaleController = {
                 search: trimmedSearch,
             },
         }
-
-        console.log(response);
 
         return sendSuccess(
             c,
@@ -836,23 +831,13 @@ export const SaleController = {
             return sendError(c, "Payment amount exceeds total amount", "INVALID_REQUEST", 422);
         }
 
-        await prisma.$transaction(async (tx) => {
-
-            await tx.payment.create({
-                data: {
-                    sale_id: saleId,
-                    amount: new Decimal(amount),
-                    method: method,
-                    reference: reference,
-                }
-            })
-
-            await tx.sale.update({
-                where: { id: saleId },
-                data: {
-                    discount_amount: new Decimal(amount),
-                }
-            })
+        await prisma.payment.create({
+            data: {
+                sale_id: saleId,
+                amount: new Decimal(amount),
+                method: method,
+                reference: reference,
+            }
         })
 
 
