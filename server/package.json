@@ -6,7 +6,9 @@
     "dev": "bun run --hot index.ts",
     "build": "bun build index.ts --compile --outfile dist/server",
     "lint": "",
-    "start": "bun run dist/server"
+    "start": "bun run index.ts",
+    "test": "bun test src/__tests__/**/*.test.ts",
+    "test:watch": "bun test --watch src/__tests__/**/*.test.ts"
   },
   "private": true,
   "devDependencies": {

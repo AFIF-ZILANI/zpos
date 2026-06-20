@@ -179,59 +179,44 @@ export const ProductController = {
         }
 
 
-        let result: CartEntryProduct | null = null;
-        await prisma.$transaction(async (tx) => {
+        const barcodeData = await prisma.barcode.findUnique({
+            where: { code: barcode, status: BarcodeStatus.ALLOCATED },
+        });
 
-            const barodeData = await tx.barcode.findUnique({
-                where: {
-                    code: barcode,
-                    status: BarcodeStatus.ALLOCATED,
-                },
-            });
+        if (!barcodeData) {
+            return sendError(c, "Barcode not found", "NOT_FOUND", 404);
+        }
 
-            if (!barodeData) {
-                return sendError(c, "Barcode not found", "NOT_FOUND", 404);
-            }
-
-            const allocation = await tx.variantBarcodeAllocation.findFirst({
-                where: {
-                    barcode_id: barodeData.id
-                },
-                include: {
-                    purchaseItem: {
-                        select: {
-                            sell_price: true,
-                        },
-                    },
-                    variant: {
-                        include: {
-                            product: true,
-                            stockLedgers: {
-                                orderBy: { created_at: "desc" },
-                                take: 1,
-                                select: { balance_after: true },
-                            },
+        const allocation = await prisma.variantBarcodeAllocation.findFirst({
+            where: { barcode_id: barcodeData.id },
+            include: {
+                purchaseItem: { select: { sell_price: true } },
+                variant: {
+                    include: {
+                        product: true,
+                        stockLedgers: {
+                            orderBy: { created_at: "desc" },
+                            take: 1,
+                            select: { balance_after: true },
                         },
                     },
                 },
-            });
+            },
+        });
 
-            if (!allocation) {
-                return sendError(c, "Barcode not found or not active", "NOT_FOUND", 404);
-            }
+        if (!allocation) {
+            return sendError(c, "Barcode not found or not active", "NOT_FOUND", 404);
+        }
 
-            const { variant, purchaseItem } = allocation;
-            const availableStock = variant.stockLedgers[0]?.balance_after ?? 0;
-
-            result = {
-                variantId: variant.id,
-                name: `${variant.product.name}${variant.name ? ` - ${variant.name}` : ""}`,
-                price: Number(purchaseItem.sell_price),
-                barcode: barodeData.code,
-                availableStock,
-            };
-        })
-        return sendSuccess(c, result ?? {}, "Variant fetched successfully", 200);
+        const { variant, purchaseItem } = allocation;
+        const result: CartEntryProduct = {
+            variantId: variant.id,
+            name: `${variant.product.name}${variant.name ? ` - ${variant.name}` : ""}`,
+            price: Number(purchaseItem.sell_price),
+            barcode: barcodeData.code,
+            availableStock: variant.stockLedgers[0]?.balance_after ?? 0,
+        };
+        return sendSuccess(c, result, "Variant fetched successfully", 200);
     },
 
     async getCartItemByVariant(c: Context) {

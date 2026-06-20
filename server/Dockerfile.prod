@@ -11,25 +11,30 @@ COPY packages/ ./packages/
 
 RUN bun install --frozen-lockfile
 
-# Generate Prisma client
+# Generate Prisma client for the correct binary target
 WORKDIR /app/server
 RUN bunx prisma generate
 
-# Build single binary
-RUN bun build ./index.ts --compile --outfile dist/server
-
 # ---- Runtime image ----
-FROM debian:bookworm-slim
+# Use Bun Alpine for a slim image — interpreted mode avoids bundling issues
+# with Prisma's @prisma/adapter-pg and its native pg driver
+FROM oven/bun:alpine
 
 WORKDIR /app
 
-# Copy compiled binary
-COPY --from=builder /app/server/dist/server .
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/bun.lock ./
+COPY --from=builder /app/server ./server
+COPY --from=builder /app/packages ./packages
 
-# Copy prisma generated client (needed at runtime)
-COPY --from=builder /app/server/generated ./generated
-COPY --from=builder /app/server/prisma ./prisma
+WORKDIR /app/server
+
+# Production-only install (no devDependencies)
+RUN bun install --frozen-lockfile --production
 
 EXPOSE 3000
 
-CMD ["./server"]
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD wget -qO- http://localhost:3000/health || exit 1
+
+CMD ["bun", "run", "index.ts"]
