@@ -108,7 +108,6 @@ export const ProductController = {
     },
     async deleteById(c: Context) {
         const { id } = await c.req.json();
-        console.log("[Delete Product]", id);
         if (!id || typeof id !== "string" || id.trim() === "") {
             return sendError(c, "Invalid ID", "BAD_REQUEST", 400);
         }
@@ -175,8 +174,6 @@ export const ProductController = {
 
     async getByBarcode(c: Context) {
         const barcode = c.req.param("barcode");
-        console.log("[Barcode]", barcode);
-
         if (!barcode?.trim()) {
             return sendError(c, "Invalid barcode", "BAD_REQUEST", 400);
         }
@@ -243,10 +240,6 @@ export const ProductController = {
         const body = c.get("validatedBody") as UpdateProductVariant;
         const { id, color, size, } = body;
 
-        console.log(id)
-        console.log(color)
-        console.log(size)
-
         if (!color && !size) {
             return sendError(c, "Color or size is required", "BAD_REQUEST", 400);
         }
@@ -275,7 +268,6 @@ export const ProductController = {
     async toggleVariantById(c: Context) {
         const { id } = await c.req.json();
 
-        console.log("[Deactive Variant]", id);
         if (!id || typeof id !== "string" || id.trim() === "") {
             return sendError(c, "Invalid ID", "BAD_REQUEST", 400);
         }
@@ -305,7 +297,6 @@ export const ProductController = {
 
         const { id } = await c.req.json();
 
-        console.log("[Delete Variant]", id);
         if (!id || typeof id !== "string" || id.trim() === "") {
             return sendError(c, "Invalid ID", "BAD_REQUEST", 400);
         }
@@ -356,7 +347,6 @@ export const ProductController = {
         return sendSuccess(c, variant, "Variant created successfully", 201);
     },
     async getProductStats(c: Context) {
-        console.log("Hello")
         const result = await prisma.$queryRaw<
             {
                 total_products: number

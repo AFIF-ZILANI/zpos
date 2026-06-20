@@ -116,8 +116,6 @@ export const PurchaseController = {
                 select: { id: true, variant_id: true, quantity: true },
             })
 
-            console.log("createdPurchaseItems", createdPurchaseItems)
-
             const barcodeRows: BarcodeRow[] = []
             const allocationRows: AllocationRow[] = []
 
@@ -172,8 +170,6 @@ export const PurchaseController = {
             }))
         })
 
-
-        console.log(formattedResult)
 
         return sendSuccess(c, { barcodeData: formattedResult }, "Purchase created successfully");
     },
@@ -289,8 +285,6 @@ export const PurchaseController = {
             items: p._count.items,
             total: Number(p.total),
         }));
-
-        console.log(data)
 
         return sendSuccess(c, { items: data, total, page: pageNum, limit: limitNum }, "Purchase history fetched successfully");
     },

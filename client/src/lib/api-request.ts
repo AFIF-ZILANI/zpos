@@ -6,17 +6,7 @@ import { useQuery, useMutation, type UseQueryOptions } from "@tanstack/react-que
  * A small helper that wraps fetch with JSON parsing + error handling.
  */
 
-// console.log(`${process.env.SERVER_URI}/${process.env.API_VERSION}`);
-// if (!process.env.SERVER_URI || !process.env.API_VERSION) {
-//   throw Error("Server Base URL is missing!");
-// }
-// const server_URI = `${process.env.SERVER_URI}/${process.env.API_VERSION}`;
-// export const server_URI = "http://localhost:3000/api";
-
-
-// export const server_URI = import.meta.env.VITE_API_URL;
-
-export const server_URI = "http://localhost:3000/api";
+export const server_URI = import.meta.env.VITE_API_URL as string;
 
 
 // If you use a custom fetch hook, grab the token like this:
@@ -93,8 +83,8 @@ export function useGetData<T>(
     queryFn: () => fetchJson<T>(endpoint, getToken),
     refetchOnWindowFocus: false,
     retry: 1,
-    staleTime: 1000 * 60 * 5, // ← add this. data stays fresh for 5 min
-    ...options,                // caller can still override if needed
+    staleTime: 1000 * 30, // 30s — POS data changes frequently
+    ...options,           // caller can still override if needed
   });
 }
 
