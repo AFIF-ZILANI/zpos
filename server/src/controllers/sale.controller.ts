@@ -35,20 +35,6 @@ function toPaymentMethod(method: string) {
     return method.toUpperCase() as "CASH" | "BKASH" | "NAGAD" | "ROCKET";
 }
 
-// async function generateInvoiceNo(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]): Promise<string> {
-//     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-//     const prefix = `INV-${datePart}-`;
-
-//     const last = await tx.sale.findFirst({
-//         where: { invoice_no: { startsWith: prefix } },
-//         orderBy: { invoice_no: "desc" },
-//         select: { invoice_no: true },
-//     });
-
-//     const nextSeq = last ? parseInt(last.invoice_no.split("-")[2]!) + 1 : 1;
-//     return `${prefix}${String(nextSeq).padStart(5, "0")}`;
-// }
-
 type StatsItem = { value: number; trend: Trend };
 interface SaleMetrics {
     totalRevenue: StatsItem;
@@ -443,7 +429,7 @@ export const SaleController = {
                 where: { key: "invoice" },
                 data: { value: { increment: 1 } },
             });
-            const invoiceNo = `INV-${new Date().getFullYear()}-${String(counter.value).padStart(5, "0")}`;
+            const invoiceNo = `INV-${new Date().getFullYear()}-${String(counter.value).padStart(6, "0")}`;
 
             // 6e. Create sale + items + optional payment
             const newSale = await tx.sale.create({
@@ -630,9 +616,6 @@ export const SaleController = {
     async getSales(c: Context) {
         const { from, to, page, limit, status = "ALL", search } = c.req.query();
 
-
-        // console.log(from, to, page, limit, status, search, type)
-
         // ── Validate inputs ────────────────────────────────────────────────────────
 
         if (!from || !to) {
@@ -782,8 +765,6 @@ export const SaleController = {
     async getPaymentData(c: Context) {
         const { invoiceNo } = c.req.query();
 
-        // console.log(invoiceNo)
-
         const sale = await prisma.sale.findUnique({
             where: { invoice_number: invoiceNo },
             include: {
@@ -831,8 +812,6 @@ export const SaleController = {
         const body: PaymentCollectPayload = await c.req.json();
 
         const { saleId, amount, method, reference } = body;
-
-        // console.log(body)
 
         if (!saleId || !amount || !method) {
             return sendError(c, "Missing required fields", "INVALID_REQUEST", 422);
