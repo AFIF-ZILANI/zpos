@@ -89,7 +89,7 @@ model User {
 
 model Customer {
   id             String  @id @default(uuid())
-  name           String?
+  name           String  @default("Walk-in Customer")
   phone          String? @unique
   email          String?
   address        String?
@@ -102,6 +102,7 @@ model Customer {
   sales Sale[]
 
   @@index([phone])
+  @@index([email])
   @@map("customers")
 }
 
