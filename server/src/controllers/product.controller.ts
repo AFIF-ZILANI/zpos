@@ -231,9 +231,49 @@ export const ProductController = {
                 availableStock,
             };
         })
-        // console.log(result)
-
         return sendSuccess(c, result ?? {}, "Variant fetched successfully", 200);
+    },
+
+    async getCartItemByVariant(c: Context) {
+        const variantId = c.req.param("variantId") ?? "";
+
+        const allocation = await prisma.variantBarcodeAllocation.findFirst({
+            where: {
+                variant_id: variantId,
+                barcode: { status: BarcodeStatus.ALLOCATED },
+            },
+            include: {
+                barcode: true,
+                purchaseItem: { select: { sell_price: true } },
+                variant: {
+                    include: {
+                        product: true,
+                        stockLedgers: {
+                            orderBy: { created_at: "desc" },
+                            take: 1,
+                            select: { balance_after: true },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!allocation) {
+            return sendError(c, "No active stock for this variant", "NOT_FOUND", 404);
+        }
+
+        const { variant, purchaseItem, barcode } = allocation;
+        const availableStock = variant.stockLedgers[0]?.balance_after ?? 0;
+
+        const result: CartEntryProduct = {
+            variantId: variant.id,
+            name: `${variant.product.name}${variant.name ? ` - ${variant.name}` : ""}`,
+            price: Number(purchaseItem.sell_price),
+            barcode: barcode.code,
+            availableStock,
+        };
+
+        return sendSuccess(c, result, "Variant cart item fetched successfully", 200);
     },
 
     async updateVariant(c: Context) {
