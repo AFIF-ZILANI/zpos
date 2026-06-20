@@ -134,10 +134,9 @@ model Product {
   normalized_key  String // lowercased+stripped for duplicate detection
   description     String?
   category_id     String
-  brand           String?
-  reorder_level   Int     @default(0)
-  is_active       Boolean @default(true)
-  base_variant_id String?
+  brand         String?
+  reorder_level Int     @default(0)
+  is_active     Boolean @default(true)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
