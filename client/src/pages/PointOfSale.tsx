@@ -123,14 +123,14 @@ const BDT = (n: number) =>
 
 // ── Stock status helpers ───────────────────────────────────────────────────────
 
-function StockBadge({ stock }: { stock: number }) {
-  if (stock === 0)
+function StockBadge({ stock, status }: { stock: number; status: ProductTableRow["status"] }) {
+  if (status === "OUT_OF_STOCK")
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-destructive/10 text-destructive">
         Out
       </span>
     );
-  if (stock <= 5)
+  if (status === "LOW_STOCK")
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-600">
         {stock}
@@ -427,7 +427,7 @@ export default function PointOfSale() {
                         {p.variants}
                       </td>
                       <td className="px-4 py-3">
-                        <StockBadge stock={p.stock} />
+                        <StockBadge stock={p.stock} status={p.status} />
                       </td>
                     </tr>
                   ))}
