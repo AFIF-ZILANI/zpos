@@ -5,7 +5,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import type {
   Sale,
   PaymentStatus,
-  // OrderStatusData,
+  OrderStatusData,
   BasicDataResponse,
   SaleMetrics,
   TimeLine,
@@ -15,7 +15,7 @@ import type {
 import { TopBar } from "@/components/sales/TopBar";
 import { StatCards } from "@/components/sales/SalesStats";
 import { UrgentTable } from "@/components/sales/UrgentTable";
-// import { OrderStatusChart } from "@/components/sales/OrderStatusChart";
+import { OrderStatusChart } from "@/components/sales/OrderStatusChart";
 import { SalesHistoryTable } from "@/components/sales/SaleHistoryTable";
 import CollectPaymentModal from "@/components/sales/CollectPaymentModal";
 // import { DeleteConfirmationModal } from "@/components/sales/DeleteConformationModal";
@@ -111,15 +111,14 @@ export default function SalesPage() {
     "SALE",
   ]);
 
-  // const { data: chartData, isFetching: chartFetching } = useGetData<{
-  //   data: OrderStatusData[];
-  //   total: number;
-  // }>(`/sales/get/chart?from=${dateFilter.from}&to=${dateFilter.to}`, [
-  //   "sales",
-  //   "chart",
-  //   dateFilter.from,
-  //   dateFilter.to,
-  // ]);
+  const { data: chartData, isFetching: chartFetching } = useGetData<{
+    data: { data: OrderStatusData[]; total: number };
+  }>(`/sales/get/chart?from=${dateFilter.from}&to=${dateFilter.to}`, [
+    "sales",
+    "chart",
+    dateFilter.from,
+    dateFilter.to,
+  ]);
 
   const historyQuery = new URLSearchParams({
     from: dateFilter.from,
@@ -275,12 +274,11 @@ export default function SalesPage() {
         </div>
 
         {/* Order Status Chart */}
-        {/* <OrderStatusChart data={Cdata} total={100} isLoading={false} /> */}
-        {/* <OrderStatusChart
-          data={chart}
-          total={chartData?.total}
+        <OrderStatusChart
+          data={chartData?.data.data}
+          total={chartData?.data.total}
           isLoading={chartFetching}
-        /> */}
+        />
       </div>
 
       {/* Sales History Table */}

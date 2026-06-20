@@ -8,7 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import PointOfSale from "@/pages/PointOfSale";
 import Products from "@/pages/Products";
 import Customers from "@/pages/Customers";
-// import Settings from "@/pages/Settings";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 import Purchases from "@/pages/Purchase";
 import NewPurchase from "@/pages/new-purchase";
@@ -16,6 +16,7 @@ import SalesPage from "./pages/Sales";
 import ProductDetailPage from "./pages/ProductDetails";
 import Login from "./pages/Login";
 import AdminPage from "./pages/Admin";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ function ProtectedRouter() {
 
   // Authenticated — render full app
   return (
+    <ErrorBoundary>
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
@@ -43,7 +45,7 @@ function ProtectedRouter() {
         <Route path="/products" component={Products} />
         <Route path="/products/:id" component={ProductDetailPage} />
         <Route path="/customers" component={Customers} />
-        {/* <Route path="/settings" component={Settings} /> */}
+        <Route path="/settings" component={Settings} />
         <Route path="/purchases" component={Purchases} />
         <Route path="/purchases/new" component={NewPurchase} />
         <Route path="/sales" component={SalesPage} />
@@ -51,6 +53,7 @@ function ProtectedRouter() {
         <Route component={NotFound} />
       </Switch>
     </Layout>
+    </ErrorBoundary>
   );
 }
 

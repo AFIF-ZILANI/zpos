@@ -729,8 +729,54 @@ export const SaleController = {
         );
     },
     async getChartData(c: Context) {
+        const { from, to } = c.req.query();
 
-        return sendSuccess(c, {}, "Chart data fetched successfully", 200);
+        const fromDate = from ? new Date(from) : new Date(new Date().setDate(new Date().getDate() - 30));
+        const toDate = to ? new Date(to) : new Date();
+
+        type StatusRow = { status: string; count: bigint };
+
+        const rows = await prisma.$queryRaw<StatusRow[]>(Prisma.sql`
+            WITH payment_sums AS (
+                SELECT
+                    s.id,
+                    s.total,
+                    COALESCE(SUM(p.amount), 0) AS paid
+                FROM sales s
+                LEFT JOIN payments p ON p.sale_id = s.id
+                WHERE s.invoiced_at >= ${fromDate}
+                  AND s.invoiced_at <= ${toDate}
+                  AND s.status = 'COMPLETED'
+                GROUP BY s.id, s.total
+            )
+            SELECT
+                CASE
+                    WHEN paid >= total THEN 'PAID'
+                    WHEN paid = 0     THEN 'DUE'
+                    ELSE                   'PARTIAL'
+                END AS status,
+                COUNT(*) AS count
+            FROM payment_sums
+            GROUP BY status
+        `);
+
+        const COLORS: Record<string, string> = {
+            PAID:    "#1D9E75",
+            DUE:     "#EF9F27",
+            PARTIAL: "#378ADD",
+        };
+        const LABELS: Record<string, string> = {
+            PAID: "Paid", DUE: "Due", PARTIAL: "Partial",
+        };
+
+        const total = rows.reduce((s, r) => s + Number(r.count), 0);
+        const data = rows.map((r) => ({
+            name:  LABELS[r.status] ?? r.status,
+            value: Number(r.count),
+            fill:  COLORS[r.status] ?? "#888888",
+        }));
+
+        return sendSuccess(c, { data, total }, "Chart data fetched successfully", 200);
     },
 
     async getPaymentData(c: Context) {
