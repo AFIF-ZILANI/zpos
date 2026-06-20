@@ -1,6 +1,5 @@
 import { Role, SaleStatus, PaymentMethod, StockMovementType, StockDirection, BarcodeStatus } from "../generated/prisma";
 import prisma from "../src/lib/prisma";
-import * as bcrypt from "bcryptjs";
 import { Decimal } from "../generated/prisma/runtime/client";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -8,10 +7,6 @@ import { Decimal } from "../generated/prisma/runtime/client";
 function rnd(min: number, max: number) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-
-// function pick<T>(arr: T[]): T {
-//     return arr[Math.floor(Math.random() * arr.length)];
-// }
 
 function dec(n: number) {
     return new Decimal(n);
@@ -35,18 +30,16 @@ async function main() {
         create: { key: "invoice", value: 1000 },
     });
 
-    // ── Users ─────────────────────────────────────────────────────────────────────
-    const passwordHash = await bcrypt.hash("password123", 10);
-
+    // ── Users (auth is Clerk-managed; seed creates DB records for invite approval) ─
     const owner = await prisma.user.upsert({
         where: { email: "owner@posapp.com" },
         update: {},
         create: {
             name: "Rafiq Ahmed",
             email: "owner@posapp.com",
-            password_hash: passwordHash,
             phone: "01711000001",
             role: Role.OWNER,
+            status: "ACCEPTED",
         },
     });
 
@@ -56,9 +49,9 @@ async function main() {
         create: {
             name: "Nusrat Jahan",
             email: "staff1@posapp.com",
-            password_hash: passwordHash,
             phone: "01711000002",
             role: Role.STAFF,
+            status: "ACCEPTED",
         },
     });
 
@@ -68,9 +61,9 @@ async function main() {
         create: {
             name: "Karim Molla",
             email: "staff2@posapp.com",
-            password_hash: passwordHash,
             phone: "01711000003",
             role: Role.STAFF,
+            status: "ACCEPTED",
         },
     });
 

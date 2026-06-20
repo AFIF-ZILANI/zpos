@@ -60,13 +60,14 @@ enum InviteStatus {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id        String       @id @default(uuid())
-  name      String?
-  email     String       @unique
-  phone     String?      @unique
-  status    InviteStatus @default(PENDING)
-  role      Role         @default(OWNER)
-  is_active Boolean      @default(true)
+  id       String  @id @default(uuid())
+  clerk_id String? @unique
+  name     String?
+  email    String  @unique
+  phone    String? @unique
+  status   InviteStatus @default(PENDING)
+  role     Role         @default(OWNER)
+  is_active Boolean     @default(true)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -78,6 +79,7 @@ model User {
   barcodesAllocated VariantBarcodeAllocation[] @relation("BarcodeAllocator")
 
   @@index([email])
+  @@index([clerk_id])
   @@map("users")
 }
 
