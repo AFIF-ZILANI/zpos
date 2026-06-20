@@ -71,6 +71,33 @@ async function getProductByBarcode(
   }
 }
 
+async function getCartItemByProductId(
+  productId: string,
+  getToken: () => Promise<string | null>,
+): Promise<CartEntryProduct | null> {
+  try {
+    const token = await getToken();
+    // Fetch product to get the single variant's ID
+    const prodRes = await fetch(`${server_URI}/products/get/${productId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!prodRes.ok) return null;
+    const prodJson: { data: { variants: { id: string }[] } } = await prodRes.json();
+    const variantId = prodJson.data?.variants?.[0]?.id;
+    if (!variantId) return null;
+
+    const cartRes = await fetch(
+      `${server_URI}/products/get/variants/${variantId}/cart-item`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!cartRes.ok) return null;
+    const cartJson: { data: CartEntryProduct } = await cartRes.json();
+    return cartJson.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Compute the per-unit discount price */
 function discountedUnitPrice(price: number, discount: Discount): number {
   if (discount.type === "percent") return price * (1 - discount.amount / 100);
@@ -272,7 +299,7 @@ export default function PointOfSale() {
         playSoundWithCacheInstance("error_beep");
       }
     },
-    [addToCart],
+    [addToCart, getToken],
   );
 
   useEffect(() => {
@@ -369,10 +396,26 @@ export default function PointOfSale() {
                   productsData.map((p) => (
                     <tr
                       key={p.id}
-                      onClick={() => {
-                        /* clicking a row with variants could open a variant picker — extend here */
+                      onClick={async () => {
+                        if (p.stock === 0) {
+                          toast.error(`${p.name} is out of stock`);
+                          return;
+                        }
+                        if (p.variants > 1) {
+                          toast.info(`${p.name} has multiple variants — scan a barcode to select one`);
+                          hidInputRef.current?.focus();
+                          return;
+                        }
+                        const item = await getCartItemByProductId(p.id, getToken);
+                        if (item) {
+                          addToCart(item);
+                          playSoundWithCacheInstance("beep");
+                        } else {
+                          toast.error(`Could not add ${p.name} to cart`);
+                          playSoundWithCacheInstance("error_beep");
+                        }
                       }}
-                      className="hover:bg-muted/30 transition-colors"
+                      className="hover:bg-muted/30 transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3 font-medium truncate max-w-0">
                         <span className="block truncate">{p.name}</span>

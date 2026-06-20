@@ -12,6 +12,7 @@ productRouter.patch("/update", validate(updateProductSchema), ProductController.
 productRouter.delete("/delete", ProductController.deleteById);
 productRouter.get("/purchase", ProductController.getPurchaseData);
 productRouter.get("/get/by-barcode/:barcode", ProductController.getByBarcode);
+productRouter.get("/get/variants/:variantId/cart-item", ProductController.getCartItemByVariant);
 productRouter.patch("/variants/toggle", ProductController.toggleVariantById);
 productRouter.patch("/variants/update", validate(updateProductVariantSchema), ProductController.updateVariant);
 productRouter.post("/variants/create", validate(createProductVariantSchemaSepa), ProductController.createVariant);
