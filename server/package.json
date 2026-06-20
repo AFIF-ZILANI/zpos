@@ -10,9 +10,7 @@
   },
   "private": true,
   "devDependencies": {
-    "@types/bcryptjs": "^3.0.0",
     "@types/bun": "latest",
-    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.6.0",
     "ts-node": "^10.9.2"
   },
@@ -26,11 +24,9 @@
     "@myapp/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
-    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "hono": "^4.12.9",
     "hono-rate-limiter": "^0.5.3",
-    "jsonwebtoken": "^9.0.3",
     "pg": "^8.20.0",
     "prisma": "^7.5.0",
     "resend": "^6.12.2",
