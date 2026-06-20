@@ -353,15 +353,6 @@ export const ProductController = {
             },
         });
 
-        if (!product.variants.length) {
-            await prisma.product.update({
-                where: { id: productId },
-                data: {
-                    base_variant_id: variant.id
-                },
-            });
-        }
-
         return sendSuccess(c, variant, "Variant created successfully", 201);
     },
     async getProductStats(c: Context) {

@@ -151,12 +151,6 @@ export const ProductService = {
                 })
 
             )
-            await tx.product.update({
-                where: { id: product.id },
-                data: {
-                    base_variant_id: variants[0]?.id,
-                }
-            })
             return { product, variants };
         });
         return result;
