@@ -1,0 +1,39 @@
+networks:
+  test-network:
+    driver: bridge
+
+services:
+  db-test:
+    image: postgres:16-alpine
+    container_name: pos-db-test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pos_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pos_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    networks:
+      - test-network
+    # Use tmpfs for speed — data is ephemeral and discarded after tests
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  test:
+    build:
+      context: .
+      dockerfile: server/Dockerfile.test
+    container_name: pos-test-runner
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db-test:5432/pos_test
+      NODE_ENV: test
+      # Dummy keys — tests mock Clerk/Resend so real values are not needed
+      CLERK_SECRET_KEY: sk_test_dummy_key_for_ci
+      RESEND_API_KEY: re_dummy_key_for_ci
+    depends_on:
+      db-test:
+        condition: service_healthy
+    networks:
+      - test-network
