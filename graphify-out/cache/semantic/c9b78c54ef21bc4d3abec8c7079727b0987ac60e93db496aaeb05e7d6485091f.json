@@ -1,1 +1,0 @@
-{"nodes": [{"id": "migrations_20260412152848_init_products_table", "label": "products table (base_variant_id column)", "file_type": "sql", "source_file": "server/prisma/migrations/20260412152848_init/migration.sql", "source_location": "line 2", "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

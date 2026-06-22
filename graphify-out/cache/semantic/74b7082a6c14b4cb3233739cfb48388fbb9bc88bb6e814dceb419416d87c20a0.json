@@ -1,1 +1,0 @@
-{"nodes": [{"id": "migrations_20260427082108_init_sales_payment_complete", "label": "sales table (payment_complete BOOLEAN, then dropped)", "file_type": "sql", "source_file": "server/prisma/migrations/20260427082108_init/migration.sql", "source_location": "line 2", "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}
