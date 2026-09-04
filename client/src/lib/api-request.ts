@@ -7,6 +7,7 @@ import { useQuery, useMutation, type UseQueryOptions } from "@tanstack/react-que
  */
 
 export const server_URI = import.meta.env.VITE_API_URL as string;
+if (!server_URI) throw new Error("Missing VITE_API_URL");
 
 
 // If you use a custom fetch hook, grab the token like this:

@@ -92,8 +92,6 @@ export default function ProductSection({
   const totalPages = productData?.data.totalPages || 0;
   const statsData = statsRes?.data;
 
-  console.log(statsData);
-
   const stats = [
     {
       label: "Total Products",

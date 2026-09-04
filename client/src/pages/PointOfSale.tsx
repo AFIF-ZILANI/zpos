@@ -9,6 +9,7 @@ import {
   Tag,
   ChevronDown,
   Package,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,6 +174,7 @@ export default function PointOfSale() {
     data: productData,
     refetch: refetchProducts,
     isFetching: isFetchingProducts,
+    isError: isProductsError,
   } = useGetData<TableResponse<ProductTableRow>>(
     `/products/get/all?${productQuery}`,
   );
@@ -432,7 +434,25 @@ export default function PointOfSale() {
                     </tr>
                   ))}
 
-                {!isFetchingProducts && productsData.length === 0 && (
+                {!isFetchingProducts && isProductsError && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="py-16 text-center text-destructive"
+                    >
+                      <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-60" />
+                      <p className="text-sm">Failed to load products</p>
+                      <button
+                        onClick={() => refetchProducts()}
+                        className="text-sm underline mt-1"
+                      >
+                        Retry
+                      </button>
+                    </td>
+                  </tr>
+                )}
+
+                {!isFetchingProducts && !isProductsError && productsData.length === 0 && (
                   <tr>
                     <td
                       colSpan={5}
