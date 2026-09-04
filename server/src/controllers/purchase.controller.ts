@@ -103,28 +103,36 @@ export const PurchaseController = {
 
             // 8. Barcode generation + allocation
 
-            const lastBarcode = await tx.barcode.findFirst({
-                orderBy: { serial: "desc" },
-                select: { serial: true },
-            })
-
-            let currentSerial = lastBarcode?.serial ?? 0
-
             // Build one barcode per unit (respecting quantity)
             const createdPurchaseItems = await tx.purchaseItem.findMany({
                 where: { purchase_id: purchase.id },
                 select: { id: true, variant_id: true, quantity: true },
             })
 
+            // Reserve serials from the DB's own sequence (barcodes.serial is a
+            // Postgres SERIAL) instead of computing them in JS via findFirst+
+            // increment — that was racy: two concurrent purchases could both
+            // read the same "last serial" and generate colliding barcodes.
+            // nextval() is atomic, so generate_series(1, N) reserves N distinct
+            // values with no risk of collision regardless of concurrency.
+            const reservedSerials = createdPurchaseItems.length
+                ? await tx.$queryRaw<Array<{ serial: number }>>(
+                    Prisma.sql`SELECT nextval('barcodes_serial_seq')::int AS serial FROM generate_series(1, ${createdPurchaseItems.length})`
+                )
+                : [];
+
             const barcodeRows: BarcodeRow[] = []
             const allocationRows: AllocationRow[] = []
 
-            for (const item of createdPurchaseItems) {
-                currentSerial += 1
-                const code = generateEAN13(currentSerial)
+            createdPurchaseItems.forEach((item, idx) => {
+                const serial = reservedSerials[idx]?.serial
+                if (serial === undefined) {
+                    throw new Error("Failed to reserve a barcode serial")
+                }
+                const code = generateEAN13(serial)
                 barcodeRows.push({
                     code,
-                    serial: currentSerial,
+                    serial,
                     status: BarcodeStatus.ALLOCATED,
                 })
                 allocationRows.push({
@@ -132,7 +140,7 @@ export const PurchaseController = {
                     variant_id: item.variant_id,
                     purchase_item_id: item.id,
                 })
-            }
+            })
 
             await tx.barcode.createMany({ data: barcodeRows })
 
