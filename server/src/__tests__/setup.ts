@@ -7,6 +7,8 @@ import categoryRouter from '@/routes/category.route'
 import saleRouter from '@/routes/sale.route'
 import dashboardRouter from '@/routes/dashbord.route'
 import customerRouter from '@/routes/customer.route'
+import purchaseRouter from '@/routes/purchase.route'
+import adminRouter from '@/routes/admin.route'
 import type { AppEnv } from '@/types'
 
 // Creates a test version of the app that bypasses Clerk auth
@@ -31,6 +33,8 @@ export function createTestApp() {
     app.route('/api/sales', saleRouter)
     app.route('/api/dashboard', dashboardRouter)
     app.route('/api/customers', customerRouter)
+    app.route('/api/purchase', purchaseRouter)
+    app.route('/api/admin', adminRouter)
 
     app.onError((err, c) => {
         if (err instanceof AppError) return sendError(c, err.message, err.code, err.status, err.details)

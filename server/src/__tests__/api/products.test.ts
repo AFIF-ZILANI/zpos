@@ -6,6 +6,8 @@ type ApiResponse<T> = { success: boolean; message: string; data: T }
 
 const app = createTestApp()
 
+const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000'
+
 const MOCK_PRODUCT = {
     id: 'prod-uuid-1',
     name: 'Test Product',
@@ -159,5 +161,42 @@ describe('DELETE /api/products/delete', () => {
         const res = await del(app, '/api/products/delete', {})
         // Validation requires an id
         expect([400, 422]).toContain(res.status)
+    })
+
+    it('returns 404 when product does not exist', async () => {
+        mockPrisma.product.findUnique.mockResolvedValueOnce(null)
+
+        const res = await del(app, '/api/products/delete', { id: VALID_UUID })
+        expect(res.status).toBe(404)
+    })
+
+    it('hard-deletes a product with no purchase/sale/stock history', async () => {
+        mockPrisma.product.findUnique.mockResolvedValueOnce(MOCK_PRODUCT)
+        mockPrisma.stockLedger.count.mockResolvedValueOnce(0)
+        mockPrisma.saleItem.count.mockResolvedValueOnce(0)
+        mockPrisma.purchaseItem.count.mockResolvedValueOnce(0)
+
+        const res = await del(app, '/api/products/delete', { id: VALID_UUID })
+        expect(res.status).toBe(200)
+
+        expect(mockPrisma.product.delete.mock.calls.length).toBe(1)
+        // Soft-delete fields must NOT be touched on the hard-delete path
+        expect(mockPrisma.product.update.mock.calls.length).toBe(0)
+    })
+
+    it('deactivates instead of deleting a product with sale history', async () => {
+        mockPrisma.product.findUnique.mockResolvedValueOnce(MOCK_PRODUCT)
+        mockPrisma.stockLedger.count.mockResolvedValueOnce(0)
+        mockPrisma.saleItem.count.mockResolvedValueOnce(3) // has been sold
+        mockPrisma.purchaseItem.count.mockResolvedValueOnce(0)
+
+        const res = await del(app, '/api/products/delete', { id: VALID_UUID })
+        expect(res.status).toBe(200)
+
+        const body = await json<ApiResponse<unknown>>(res)
+        expect(body.message).toContain('deactivated')
+
+        // The hard-delete path must NOT run when history exists
+        expect(mockPrisma.product.delete.mock.calls.length).toBe(0)
     })
 })
