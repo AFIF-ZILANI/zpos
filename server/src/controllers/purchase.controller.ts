@@ -347,6 +347,28 @@ export const PurchaseController = {
             // 4. Delete stock ledger entries
             await tx.stockLedger.deleteMany({ where: { purchase_id: id } });
 
+            // 4b. Recompute running balance_after for any remaining ledger
+            // entries on the affected variants — later entries (e.g. a
+            // subsequent purchase) were computed as a running sum that
+            // included this purchase's quantity, so they're now stale.
+            for (const variantId of new Set(variantIds)) {
+                const remaining = await tx.stockLedger.findMany({
+                    where: { variant_id: variantId },
+                    orderBy: { created_at: "asc" },
+                });
+
+                let running = 0;
+                for (const entry of remaining) {
+                    running += entry.direction === StockDirection.IN ? entry.quantity : -entry.quantity;
+                    if (entry.balance_after !== running) {
+                        await tx.stockLedger.update({
+                            where: { id: entry.id },
+                            data: { balance_after: running },
+                        });
+                    }
+                }
+            }
+
             // 5. Delete purchase items
             await tx.purchaseItem.deleteMany({ where: { purchase_id: id } });
 
