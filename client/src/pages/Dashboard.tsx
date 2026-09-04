@@ -17,12 +17,12 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
+  BarChart,
+  Bar,
   Cell,
+  LabelList,
 } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { useGetData } from "@/lib/api-request";
 import type {
   CategorySalesEntry,
@@ -36,7 +36,17 @@ import { formatCurrencyInBDT, StatusBadgeSales } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "date-fns";
 
-const pieColors = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#06b6d4"];
+const weeklySalesChartConfig = {
+  sales: { label: "Revenue", color: "hsl(var(--chart-1))" },
+} satisfies ChartConfig;
+
+const categoryChartColors = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+];
 
 export default function Dashboard() {
   const { data: incomeStats } = useGetData<{
@@ -45,10 +55,10 @@ export default function Dashboard() {
   const { data: incomeStatTrend } = useGetData<{ data: DashboardStatTrend }>(
     "/dashboard/get/stat-trend",
   );
-  const { data: incomeCategoryGraph } = useGetData<{
+  const { data: incomeCategoryGraph, isFetching: isCategoryGraphFetching } = useGetData<{
     data: CategorySalesEntry[];
   }>("/dashboard/get/category-graph");
-  const { data: incomeWeeklySalesGraph } = useGetData<{
+  const { data: incomeWeeklySalesGraph, isFetching: isWeeklySalesFetching } = useGetData<{
     data: WeeklySalesEntry[];
   }>("/dashboard/get/weekly-sales-graph");
 
@@ -78,8 +88,6 @@ export default function Dashboard() {
       change: `${(statTrendData?.revenue.percentage || 0).toFixed(2)}%`,
       up: statTrendData?.revenue.type === "UP",
       icon: DollarSign,
-      color:
-        "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400",
     },
     {
       label: "Today's Sales",
@@ -87,7 +95,6 @@ export default function Dashboard() {
       change: `${(statTrendData?.sales.percentage || 0).toFixed(2)}%`,
       up: statTrendData?.sales.type === "UP",
       icon: ShoppingBag,
-      color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
     },
     {
       label: "Active Customers",
@@ -95,8 +102,6 @@ export default function Dashboard() {
       change: `${(statTrendData?.customers.percentage || 0).toFixed(2)}%`,
       up: statTrendData?.customers.type === "UP",
       icon: Users,
-      color:
-        "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
     },
     {
       label: "Average Order Value",
@@ -104,8 +109,6 @@ export default function Dashboard() {
       change: `${(statTrendData?.averageOrderValue.percentage || 0).toFixed(2)}%`,
       up: statTrendData?.averageOrderValue.type === "UP",
       icon: Package,
-      color:
-        "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400",
     },
   ];
   return (
@@ -129,22 +132,22 @@ export default function Dashboard() {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <Card key={stat.label} className="border border-border">
+          <Card key={stat.label}>
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold text-foreground mt-1">
+                  <p className="font-serif text-2xl font-semibold text-foreground mt-1">
                     {stat.value}
                   </p>
                   <div className="flex items-center gap-1 mt-1.5">
                     {stat.up ? (
-                      <TrendingUp className="w-3.5 h-3.5 text-green-500" />
+                      <TrendingUp className="w-3.5 h-3.5 text-success" />
                     ) : (
-                      <TrendingDown className="w-3.5 h-3.5 text-red-500" />
+                      <TrendingDown className="w-3.5 h-3.5 text-destructive" />
                     )}
                     <span
-                      className={`text-xs font-medium ${stat.up ? "text-green-600" : "text-red-600"}`}
+                      className={`font-mono text-xs font-medium ${stat.up ? "text-success" : "text-destructive"}`}
                     >
                       {stat.change}
                     </span>
@@ -153,7 +156,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
-                <div className={`p-2.5 rounded-xl ${stat.color}`}>
+                <div className="p-2.5 rounded-xl bg-accent text-accent-foreground">
                   <stat.icon className="w-5 h-5" />
                 </div>
               </div>
@@ -165,120 +168,140 @@ export default function Dashboard() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Weekly Sales Chart */}
-        <Card className="xl:col-span-2 border border-border">
+        <Card className="xl:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">
-                Weekly Sales
+              <CardTitle className="font-serif text-base font-semibold">
+                Weekly sales
               </CardTitle>
               <Badge variant="outline" className="text-xs">
-                This Week
+                This week
               </Badge>
             </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart
-                data={weeklySalesGraphData}
-                margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient
-                    id="salesGradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--border))"
-                />
-                <XAxis
-                  dataKey="day"
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(val: number) => [`$${val}`, "Revenue"]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="sales"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  fill="url(#salesGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {isWeeklySalesFetching ? (
+              <Skeleton className="w-full h-[220px]" />
+            ) : !weeklySalesGraphData || weeklySalesGraphData.length === 0 ? (
+              <div className="h-[220px] flex flex-col items-center justify-center text-center gap-1">
+                <p className="text-sm text-muted-foreground">No sales recorded this week</p>
+                <p className="text-xs text-muted-foreground">New sales will appear here as they come in</p>
+              </div>
+            ) : (
+              <ChartContainer config={weeklySalesChartConfig} className="aspect-auto h-[220px] w-full">
+                <AreaChart
+                  data={weeklySalesGraphData}
+                  margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient
+                      id="salesGradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                  />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fontFamily: "var(--app-font-mono)", fill: "hsl(var(--muted-foreground))" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) => formatCurrencyInBDT(Number(value))}
+                      />
+                    }
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sales"
+                    stroke="hsl(var(--chart-1))"
+                    strokeWidth={2}
+                    fill="url(#salesGradient)"
+                  />
+                </AreaChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
 
         {/* Category Breakdown */}
-        <Card className="border border-border">
+        <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">
-                Sales by Category
+              <CardTitle className="font-serif text-base font-semibold">
+                Sales by category
               </CardTitle>
               <Badge variant="outline" className="text-xs">
-                This Week
+                This week
               </Badge>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-40 w-full mb-3">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryGraphData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={68}
-                    dataKey="value"
-                    strokeWidth={0}
-                  >
-                    {categoryGraphData?.map((_, i) => (
-                      <Cell key={i} fill={pieColors[i % pieColors.length]} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-2">
-              {categoryGraphData?.map((item, i) => (
-                <div
-                  key={item.name}
-                  className="flex items-center justify-between text-sm"
+            {isCategoryGraphFetching ? (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="w-full h-6" />
+                ))}
+              </div>
+            ) : !categoryGraphData || categoryGraphData.length === 0 ? (
+              <div className="h-40 flex flex-col items-center justify-center text-center gap-1">
+                <p className="text-sm text-muted-foreground">No category sales yet</p>
+              </div>
+            ) : (
+              <ChartContainer
+                config={{}}
+                className="aspect-auto w-full"
+                style={{ height: categoryGraphData.length * 36 }}
+              >
+                <BarChart
+                  data={categoryGraphData}
+                  layout="vertical"
+                  margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
                 >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ background: pieColors[i] }}
+                  <XAxis type="number" hide domain={[0, 100]} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tickLine={false}
+                    axisLine={false}
+                    width={100}
+                    tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
+                  />
+                  <ChartTooltip
+                    content={<ChartTooltipContent formatter={(value) => `${value}%`} />}
+                  />
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={16}>
+                    {categoryGraphData.map((_, i) => (
+                      <Cell key={i} fill={categoryChartColors[i % categoryChartColors.length]} />
+                    ))}
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      formatter={(v: number) => `${v}%`}
+                      className="font-mono"
+                      fill="hsl(var(--foreground))"
+                      fontSize={12}
                     />
-                    <span className="text-muted-foreground">{item.name}</span>
-                  </div>
-                  <span className="font-medium">{item.value}%</span>
-                </div>
-              ))}
-            </div>
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -369,7 +392,7 @@ export default function Dashboard() {
                         {formatCurrencyInBDT(p.revenue)}
                       </p>
                       <p
-                        className={`text-xs font-medium ${p.trend.startsWith("+") ? "text-green-600" : "text-red-500"}`}
+                        className={`text-xs font-medium ${p.trend.startsWith("+") ? "text-success" : "text-destructive"}`}
                       >
                         {p.trend}
                       </p>
