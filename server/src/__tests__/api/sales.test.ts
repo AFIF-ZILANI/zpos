@@ -88,6 +88,7 @@ describe('POST /api/sales/payment/create', () => {
     })
 
     it('returns 422 when payment would exceed total', async () => {
+        mockPrisma.$queryRaw.mockResolvedValueOnce([{ id: 'sale-1' }])
         mockPrisma.sale.findUnique.mockResolvedValueOnce({
             id: 'sale-1',
             invoice_number: 'INV-2026-000001',
@@ -108,6 +109,7 @@ describe('POST /api/sales/payment/create', () => {
     })
 
     it('creates payment and does NOT update sale discount (bug fix verification)', async () => {
+        mockPrisma.$queryRaw.mockResolvedValueOnce([{ id: 'sale-1' }])
         mockPrisma.sale.findUnique.mockResolvedValueOnce({
             id: 'sale-1',
             invoice_number: 'INV-2026-000001',
@@ -138,6 +140,7 @@ describe('POST /api/sales/payment/create', () => {
     })
 
     it('passes correct args to payment.create', async () => {
+        mockPrisma.$queryRaw.mockResolvedValueOnce([{ id: 'sale-abc' }])
         mockPrisma.sale.findUnique.mockResolvedValueOnce({
             id: 'sale-abc',
             invoice_number: 'INV-2026-000001',

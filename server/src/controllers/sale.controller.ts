@@ -25,10 +25,12 @@ function calcLineDiscount(
     quantity: number,
     discount: { type: "percent" | "fixed"; amount: number }
 ): number {
+    const lineGross = sellPrice * quantity;
     if (discount.type === "percent") {
-        return +(sellPrice * quantity * (discount.amount / 100)).toFixed(2);
+        const pct = Math.min(discount.amount, 100);
+        return +(lineGross * (pct / 100)).toFixed(2);
     }
-    return +Math.min(discount.amount, sellPrice * quantity).toFixed(2);
+    return +Math.min(discount.amount, lineGross).toFixed(2);
 }
 
 function toPaymentMethod(method: string) {
@@ -823,48 +825,47 @@ export const SaleController = {
             return sendError(c, "Invalid payment method", "INVALID_REQUEST", 422);
         }
 
-        const sale = await prisma.sale.findUnique({
-            where: { id: saleId },
-            select: {
-                id: true,
-                invoice_number: true,
-                payments: true,
-                total: true,
-                customer: {
-                    select: {
-                        name: true,
-                        phone: true,
-                        email: true,
-                        address: true,
-                    },
-                },
+        const result = await prisma.$transaction(async (tx) => {
+            // Lock the sale row so concurrent payment requests serialize —
+            // otherwise two requests can both read the same prior-paid sum,
+            // both pass the "doesn't exceed total" check, and both insert.
+            const locked = await tx.$queryRaw<Array<{ id: string }>>(
+                Prisma.sql`SELECT id FROM sales WHERE id = ${saleId} FOR UPDATE`
+            );
+
+            if (locked.length === 0) {
+                throw new AppError("Sale not found", "NOT_FOUND", 404);
             }
+
+            const sale = await tx.sale.findUnique({
+                where: { id: saleId },
+                select: { id: true, total: true, payments: true },
+            });
+
+            if (!sale) {
+                throw new AppError("Sale not found", "NOT_FOUND", 404);
+            }
+
+            const paidAmount = sale.payments.reduce(
+                (sum, p) => sum.add(p.amount),
+                new Decimal(0)
+            );
+
+            if (paidAmount.add(new Decimal(amount)).gt(sale.total)) {
+                throw new AppError("Payment amount exceeds total amount", "INVALID_REQUEST", 422);
+            }
+
+            await tx.payment.create({
+                data: {
+                    sale_id: saleId,
+                    amount: new Decimal(amount),
+                    method: method,
+                    reference: reference,
+                }
+            });
         });
 
-        if (!sale) {
-            return sendError(c, "Sale not found", "NOT_FOUND", 404);
-        }
-
-        const paidAmount = sale.payments.reduce(
-            (sum, p) => sum.add(p.amount),
-            new Decimal(0)
-        );
-
-        if (paidAmount.add(new Decimal(amount)).gt(sale.total)) {
-            return sendError(c, "Payment amount exceeds total amount", "INVALID_REQUEST", 422);
-        }
-
-        await prisma.payment.create({
-            data: {
-                sale_id: saleId,
-                amount: new Decimal(amount),
-                method: method,
-                reference: reference,
-            }
-        })
-
-
-        return sendSuccess(c, {}, "Payment data fetched successfully", 200);
+        return sendSuccess(c, result, "Payment recorded successfully", 200);
     }
 
 }
