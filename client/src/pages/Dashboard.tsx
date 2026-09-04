@@ -17,12 +17,12 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
 } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { useGetData } from "@/lib/api-request";
 import type {
   CategorySalesEntry,
@@ -38,6 +38,10 @@ import { formatDate } from "date-fns";
 
 const pieColors = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#06b6d4"];
 
+const weeklySalesChartConfig = {
+  sales: { label: "Revenue", color: "hsl(var(--chart-1))" },
+} satisfies ChartConfig;
+
 export default function Dashboard() {
   const { data: incomeStats } = useGetData<{
     data: DashboardStats;
@@ -48,7 +52,7 @@ export default function Dashboard() {
   const { data: incomeCategoryGraph } = useGetData<{
     data: CategorySalesEntry[];
   }>("/dashboard/get/category-graph");
-  const { data: incomeWeeklySalesGraph } = useGetData<{
+  const { data: incomeWeeklySalesGraph, isFetching: isWeeklySalesFetching } = useGetData<{
     data: WeeklySalesEntry[];
   }>("/dashboard/get/weekly-sales-graph");
 
@@ -158,68 +162,75 @@ export default function Dashboard() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Weekly Sales Chart */}
-        <Card className="xl:col-span-2 border border-border">
+        <Card className="xl:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">
-                Weekly Sales
+              <CardTitle className="font-serif text-base font-semibold">
+                Weekly sales
               </CardTitle>
               <Badge variant="outline" className="text-xs">
-                This Week
+                This week
               </Badge>
             </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart
-                data={weeklySalesGraphData}
-                margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient
-                    id="salesGradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--border))"
-                />
-                <XAxis
-                  dataKey="day"
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(val: number) => [`$${val}`, "Revenue"]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="sales"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  fill="url(#salesGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {isWeeklySalesFetching ? (
+              <Skeleton className="w-full h-[220px]" />
+            ) : !weeklySalesGraphData || weeklySalesGraphData.length === 0 ? (
+              <div className="h-[220px] flex flex-col items-center justify-center text-center gap-1">
+                <p className="text-sm text-muted-foreground">No sales recorded this week</p>
+                <p className="text-xs text-muted-foreground">New sales will appear here as they come in</p>
+              </div>
+            ) : (
+              <ChartContainer config={weeklySalesChartConfig} className="aspect-auto h-[220px] w-full">
+                <AreaChart
+                  data={weeklySalesGraphData}
+                  margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient
+                      id="salesGradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                  />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fontFamily: "var(--app-font-mono)", fill: "hsl(var(--muted-foreground))" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) => formatCurrencyInBDT(Number(value))}
+                      />
+                    }
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sales"
+                    stroke="hsl(var(--chart-1))"
+                    strokeWidth={2}
+                    fill="url(#salesGradient)"
+                  />
+                </AreaChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
 
