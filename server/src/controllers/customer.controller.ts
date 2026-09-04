@@ -124,7 +124,7 @@ export const customerController = {
         const body = c.get("validatedBody") as CreateCustomer
         const { name, email, phone, address } = body;
 
-        await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             const existingCustomer = await tx.customer.findFirst({
                 where: {
                     OR: [
@@ -137,7 +137,7 @@ export const customerController = {
                 return sendError(c, "Customer already exists", "CUSTOMER_ALREADY_EXISTS", 400);
             }
 
-            await tx.customer.create({
+            return await tx.customer.create({
                 data: {
                     name,
                     email,
@@ -145,11 +145,12 @@ export const customerController = {
                     address,
                 },
             });
-
-
         })
 
-        return sendSuccess(c, {}, "Customer created successfully", 201);
+        // sendError returns a Response — if the transaction returned an error response, bubble it up
+        if (result instanceof Response) return result;
+
+        return sendSuccess(c, result, "Customer created successfully", 201);
     },
     updateCustomer: async (c: Context) => {
         const { id, name, email, phone, address } = c.get("validatedBody") as UpdateCustomer;
