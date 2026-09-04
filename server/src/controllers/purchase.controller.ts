@@ -295,8 +295,28 @@ export const PurchaseController = {
         if (!id || typeof id !== "string" || id.trim() === "") {
             return sendError(c, "Purchase ID is required", "BAD_REQUEST", 400);
         }
-        const purchase = await prisma.purchase.findUnique({ where: { id } });
+        const purchase = await prisma.purchase.findUnique({
+            where: { id },
+            include: { items: { select: { variant_id: true } } },
+        });
         if (!purchase) return sendError(c, "Purchase not found", "BAD_REQUEST", 404);
+
+        // The schema has no per-unit FIFO tracking, so we can't tell whether
+        // THIS purchase's specific barcodes were sold — conservatively block
+        // deletion if the variant has any sale history at all, so we never
+        // delete stock_ledgers/barcodes that a completed sale depends on.
+        const variantIds = purchase.items.map((i) => i.variant_id);
+        const soldCount = await prisma.saleItem.count({
+            where: { variant_id: { in: variantIds } },
+        });
+        if (soldCount > 0) {
+            return sendError(
+                c,
+                "Cannot delete: one or more products from this purchase have already been sold",
+                "PURCHASE_HAS_SALES",
+                409
+            );
+        }
 
         await prisma.$transaction(async (tx) => {
             // 1. Get barcode ids
