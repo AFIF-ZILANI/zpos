@@ -862,7 +862,7 @@ Remove line 39: `const pieColors = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", 
 
 - [ ] **Step 3: Add a chart config for category breakdown**
 
-Next to `weeklySalesChartConfig` (added in Task 6, Step 2), add:
+Immediately after the `weeklySalesChartConfig` constant added in Task 6 Step 2 (i.e. directly below its closing `} satisfies ChartConfig;` line, still above `export default function Dashboard()`), add:
 
 ```tsx
 const categoryChartColors = [
