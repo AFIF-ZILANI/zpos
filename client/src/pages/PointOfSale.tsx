@@ -127,18 +127,18 @@ const BDT = (n: number) =>
 function StockBadge({ stock, status }: { stock: number; status: ProductTableRow["status"] }) {
   if (status === "OUT_OF_STOCK")
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-destructive/10 text-destructive">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-destructive/10 text-destructive">
         Out
       </span>
     );
   if (status === "LOW_STOCK")
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-600">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-warning/10 text-warning">
         {stock}
       </span>
     );
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-600">
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-success/10 text-success">
       {stock}
     </span>
   );
@@ -417,7 +417,7 @@ export default function PointOfSale() {
                           playSoundWithCacheInstance("error_beep");
                         }
                       }}
-                      className="hover:bg-muted/30 transition-colors cursor-pointer"
+                      className="hover:bg-primary/5 transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3 font-medium truncate max-w-0">
                         <span className="block truncate">{p.name}</span>
@@ -701,11 +701,11 @@ export default function PointOfSale() {
                   <>
                     <div className="flex justify-between text-muted-foreground">
                       <span>Subtotal</span>
-                      <span className="tabular-nums">{BDT(subtotal)}</span>
+                      <span className="font-mono tabular-nums">{BDT(subtotal)}</span>
                     </div>
-                    <div className="flex justify-between text-emerald-600">
+                    <div className="flex justify-between text-success">
                       <span>Discount</span>
-                      <span className="tabular-nums">
+                      <span className="font-mono tabular-nums">
                         -{BDT(totalDiscount)}
                       </span>
                     </div>
@@ -713,7 +713,7 @@ export default function PointOfSale() {
                 )}
                 <div className="flex justify-between font-semibold text-base pt-1 border-t border-border">
                   <span>Total</span>
-                  <span className="tabular-nums">{BDT(total)}</span>
+                  <span className="font-mono tabular-nums">{BDT(total)}</span>
                 </div>
               </div>
 
@@ -724,7 +724,7 @@ export default function PointOfSale() {
                 disabled={cart.length === 0}
               >
                 <CreditCard className="w-4 h-4" />
-                Charge {BDT(total)}
+                <span className="font-mono">Charge {BDT(total)}</span>
               </Button>
             </div>
           )}
