@@ -4,7 +4,7 @@
 
 **Goal:** Fix all critical bugs, security gaps, schema design issues, and UX problems across the full POS stack — database first, then backend API, then frontend.
 
-**Architecture:** PostgreSQL (Prisma ORM) → Hono.js API on Bun runtime → React + Vite frontend with Clerk auth. Shared `@myapp/shared` package for Zod schemas and TypeScript types. Docker Compose for local dev.
+**Architecture:** PostgreSQL (Prisma ORM) → Hono.js API on Bun runtime → React + Vite frontend with Clerk auth. Shared `@myapp/shared` package for Zod schemas and TypeScript types. Client deploys to Vercel, server deploys to Railway.
 
 **Tech Stack:** Bun, Hono.js, Prisma, PostgreSQL, React 18, Vite, TanStack Query, Clerk, shadcn/ui, Zod, Sonner, Wouter, TypeScript.
 
