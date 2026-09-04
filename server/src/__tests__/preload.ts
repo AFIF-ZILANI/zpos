@@ -4,6 +4,8 @@ import { mock } from 'bun:test'
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/pos_test'
 process.env.CLERK_SECRET_KEY = 'sk_test_dummy_key_for_testing_only'
 process.env.RESEND_API_KEY = 're_dummy_key_for_testing'
+process.env.CLIENT_URL = 'http://localhost:5173'
+process.env.EMAIL_DOMAIN = 'test.local'
 process.env.NODE_ENV = 'test'
 
 const makeModel = () => ({
@@ -37,6 +39,7 @@ export const mockPrisma = {
     variantBarcodeAllocation: makeModel(),
     counter: makeModel(),
     stockAdjustment: makeModel(),
+    supplier: makeModel(),
     user: makeModel(),
     $queryRaw: mock(() => Promise.resolve([])),
     $executeRaw: mock(() => Promise.resolve(0)),
@@ -48,6 +51,14 @@ export const mockPrisma = {
 // Replace the real prisma singleton with our mock
 mock.module('@/lib/prisma', () => ({ default: mockPrisma }))
 
+// Replace the real Resend client so invite tests never hit the network
+export const mockResend = {
+    emails: {
+        send: mock(() => Promise.resolve({ data: { id: 'test-email-id' }, error: null })),
+    },
+}
+mock.module('@/lib/resend', () => ({ resend: mockResend }))
+
 // Reset call history on all mock functions between tests
 export function resetAllMocks() {
     const resetModel = (m: ReturnType<typeof makeModel>) => {
@@ -58,7 +69,7 @@ export function resetAllMocks() {
     const models = [
         'product', 'productVariant', 'category', 'customer', 'sale', 'saleItem',
         'payment', 'purchase', 'purchaseItem', 'stockLedger', 'barcode',
-        'variantBarcodeAllocation', 'counter', 'stockAdjustment', 'user',
+        'variantBarcodeAllocation', 'counter', 'stockAdjustment', 'supplier', 'user',
     ] as const
     for (const key of models) {
         resetModel(mockPrisma[key] as any)
@@ -66,6 +77,10 @@ export function resetAllMocks() {
     if ('mockReset' in mockPrisma.$queryRaw) (mockPrisma.$queryRaw as any).mockReset()
     if ('mockReset' in mockPrisma.$executeRaw) (mockPrisma.$executeRaw as any).mockReset()
     if ('mockReset' in mockPrisma.$transaction) (mockPrisma.$transaction as any).mockReset()
+    mockResend.emails.send.mockReset()
+    mockResend.emails.send.mockImplementation(() =>
+        Promise.resolve({ data: { id: 'test-email-id' }, error: null })
+    )
 
     // Restore default implementations after reset
     mockPrisma.$queryRaw.mockImplementation(() => Promise.resolve([]))

@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import prisma from "@/lib/prisma";
 import type { CustomerTableData } from "@/types";
 import type { CreateCustomer, UpdateCustomer } from "@myapp/shared/schemas/customer.schema";
+import type { IdBody } from "@myapp/shared/schemas/helper";
 
 export const customerController = {
     getAllCustomers: async (c: Context) => {
@@ -124,7 +125,7 @@ export const customerController = {
         const body = c.get("validatedBody") as CreateCustomer
         const { name, email, phone, address } = body;
 
-        await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             const existingCustomer = await tx.customer.findFirst({
                 where: {
                     OR: [
@@ -137,7 +138,7 @@ export const customerController = {
                 return sendError(c, "Customer already exists", "CUSTOMER_ALREADY_EXISTS", 400);
             }
 
-            await tx.customer.create({
+            return await tx.customer.create({
                 data: {
                     name,
                     email,
@@ -145,11 +146,12 @@ export const customerController = {
                     address,
                 },
             });
-
-
         })
 
-        return sendSuccess(c, {}, "Customer created successfully", 201);
+        // sendError returns a Response — if the transaction returned an error response, bubble it up
+        if (result instanceof Response) return result;
+
+        return sendSuccess(c, result, "Customer created successfully", 201);
     },
     updateCustomer: async (c: Context) => {
         const { id, name, email, phone, address } = c.get("validatedBody") as UpdateCustomer;
@@ -190,11 +192,7 @@ export const customerController = {
         return sendSuccess(c, result, "Customer updated successfully", 200);
     },
     toggleCustomerStatus: async (c: Context) => {
-        const { id } = await c.req.json()
-
-        if (!id || typeof id !== "string" || id.trim() === "") {
-            return sendError(c, "Customer ID is required", "CUSTOMER_ID_REQUIRED", 400);
-        }
+        const { id } = c.get("validatedBody") as IdBody;
 
         const result = await prisma.$transaction(async (tx) => {
             const customer = await tx.customer.findUnique({

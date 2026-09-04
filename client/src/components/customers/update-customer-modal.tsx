@@ -73,7 +73,6 @@ function EditCustomerForm({
   open,
   onClose,
 }: Prop) {
-  console.log(customer);
   const form = useForm<UpdateCustomer>({
     resolver: zodResolver(updateCustomerSchema),
     defaultValues: {

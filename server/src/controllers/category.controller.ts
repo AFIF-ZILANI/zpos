@@ -1,24 +1,12 @@
 import type { Context } from "hono";
 import { sendError, sendSuccess } from "@/utils/response";
 import prisma from "@/lib/prisma";
-import type { UpdateCategory } from "@myapp/shared/schemas/category.schema";
+import type { CategoryFormValues, UpdateCategory } from "@myapp/shared/schemas/category.schema";
+import { AppError } from "@/utils/AppError";
 
 export const categoryController = {
     async createCategory(c: Context) {
-        const body = await c.req.json();
-        const { name, description, parent_id } = body;
-
-        if (!name || typeof name !== "string" || name.trim().length === 0) {
-            return sendError(c, "Category name is required", "INVALID_INPUT", 400);
-        }
-
-        if (parent_id && typeof parent_id !== "string" && parent_id.trim().length === 0) {
-            return sendError(c, "Parent ID must be a string", "INVALID_INPUT", 400);
-        }
-
-        if (description && typeof description !== "string" && description.trim().length === 0) {
-            return sendError(c, "Description must be a string", "INVALID_INPUT", 400);
-        }
+        const { name, description, parent_id } = c.get("validatedBody") as CategoryFormValues;
 
         const existingCategory = await prisma.category.findFirst({
             where: {
@@ -142,13 +130,7 @@ export const categoryController = {
             });
 
             if (hasProductsLinked.length > 0) {
-
-                throw new Error("Category has products linked", {
-                    cause: {
-                        code: "INVALID_INPUT",
-                        statusCode: 400,
-                    }
-                });
+                throw new AppError("Category has products linked", "INVALID_INPUT", 400);
             }
 
             if (childrenIds.length > 0) {

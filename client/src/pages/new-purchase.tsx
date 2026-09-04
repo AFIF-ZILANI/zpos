@@ -42,7 +42,6 @@ export default function NewPurchaseOrderPage() {
     (barcodeData as { data: { barcodeData: BarcodePrintData[] } })?.data
       ?.barcodeData || [];
 
-  console.log(barcodes);
   const itemsList = itemsData?.data || [];
   const form = useForm<NewPurchase>({
     resolver: zodResolver(newPurchaseSchema),

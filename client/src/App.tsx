@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@clerk/react";
+import type { BasicDataResponse } from "@myapp/shared";
+import { useGetData } from "@/lib/api-request";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import PointOfSale from "@/pages/PointOfSale";
@@ -22,6 +24,9 @@ const queryClient = new QueryClient();
 
 function ProtectedRouter() {
   const { isSignedIn, isLoaded } = useAuth();
+  const { data: me, isLoading: meLoading } = useGetData<
+    BasicDataResponse<{ userId: string; role: "OWNER" | "STAFF" }>
+  >("/me", ["me"], { enabled: isSignedIn });
 
   // Clerk is still initializing — render nothing to avoid flash
   if (!isLoaded) {
@@ -35,10 +40,12 @@ function ProtectedRouter() {
   // Not authenticated — send to login
   if (!isSignedIn) return <Redirect to="/login" />;
 
+  const isOwner = me?.data.role === "OWNER";
+
   // Authenticated — render full app
   return (
     <ErrorBoundary>
-    <Layout>
+    <Layout isOwner={isOwner}>
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/pos" component={PointOfSale} />
@@ -49,7 +56,9 @@ function ProtectedRouter() {
         <Route path="/purchases" component={Purchases} />
         <Route path="/purchases/new" component={NewPurchase} />
         <Route path="/sales" component={SalesPage} />
-        <Route path="/admin" component={AdminPage} />
+        <Route path="/admin">
+          {meLoading ? null : isOwner ? <AdminPage /> : <Redirect to="/" />}
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -415,7 +415,6 @@ function VariantsSection({
   const inactiveVariants = (product.variants ?? []).filter((v) => !v.isActive);
 
   function handleSaveVariant(variant: Variant) {
-    console.log(variant);
     updateVariant(
       {
         id: variant.id,

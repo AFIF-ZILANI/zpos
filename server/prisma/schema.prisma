@@ -121,7 +121,7 @@ model Category {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  parent   Category?  @relation("CategoryHierarchy", fields: [parent_id], references: [id])
+  parent   Category?  @relation("CategoryHierarchy", fields: [parent_id], references: [id], onDelete: SetNull)
   children Category[] @relation("CategoryHierarchy")
   products Product[]
 
@@ -142,7 +142,7 @@ model Product {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  category Category         @relation(fields: [category_id], references: [id])
+  category Category         @relation(fields: [category_id], references: [id], onDelete: Restrict)
   variants ProductVariant[]
 
   @@index([category_id])
@@ -161,7 +161,7 @@ model ProductVariant {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  product Product @relation(fields: [product_id], references: [id])
+  product Product @relation(fields: [product_id], references: [id], onDelete: Restrict)
 
   saleItems                 SaleItem[]
   purchaseItems             PurchaseItem[]
@@ -190,7 +190,7 @@ model Barcode {
 
   created_at DateTime @default(now())
 
-  retiredByUser User?                     @relation("BarcodeRetirer", fields: [retired_by], references: [id])
+  retiredByUser User?                     @relation("BarcodeRetirer", fields: [retired_by], references: [id], onDelete: SetNull)
   allocation    VariantBarcodeAllocation? // null until allocated
 
   @@index([code])
@@ -210,10 +210,10 @@ model VariantBarcodeAllocation {
   allocated_by String
   allocated_at DateTime @default(now())
 
-  barcode         Barcode        @relation(fields: [barcode_id], references: [id])
-  variant         ProductVariant @relation(fields: [variant_id], references: [id])
-  purchaseItem    PurchaseItem   @relation(fields: [purchase_item_id], references: [id])
-  allocatedByUser User           @relation("BarcodeAllocator", fields: [allocated_by], references: [id])
+  barcode         Barcode        @relation(fields: [barcode_id], references: [id], onDelete: Restrict)
+  variant         ProductVariant @relation(fields: [variant_id], references: [id], onDelete: Restrict)
+  purchaseItem    PurchaseItem   @relation(fields: [purchase_item_id], references: [id], onDelete: Restrict)
+  allocatedByUser User           @relation("BarcodeAllocator", fields: [allocated_by], references: [id], onDelete: Restrict)
 
   @@index([barcode_id])
   @@index([variant_id])
@@ -251,8 +251,8 @@ model Purchase {
   date       DateTime
   created_at DateTime @default(now())
 
-  supplier Supplier? @relation(fields: [supplier_id], references: [id])
-  user     User      @relation(fields: [user_id], references: [id])
+  supplier Supplier? @relation(fields: [supplier_id], references: [id], onDelete: SetNull)
+  user     User      @relation(fields: [user_id], references: [id], onDelete: Restrict)
 
   items        PurchaseItem[]
   stockLedgers StockLedger[]
@@ -276,8 +276,8 @@ model PurchaseItem {
   sell_price Decimal @db.Decimal(10, 2) // price at time of purchase (snapshot)
   total      Decimal @db.Decimal(10, 2)
 
-  purchase                  Purchase                   @relation(fields: [purchase_id], references: [id])
-  variant                   ProductVariant             @relation(fields: [variant_id], references: [id])
+  purchase                  Purchase                   @relation(fields: [purchase_id], references: [id], onDelete: Restrict)
+  variant                   ProductVariant             @relation(fields: [variant_id], references: [id], onDelete: Restrict)
   variantBarcodeAllocations VariantBarcodeAllocation[]
 
   @@index([purchase_id])
@@ -320,8 +320,8 @@ model Sale {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  user     User      @relation(fields: [user_id], references: [id])
-  customer Customer? @relation(fields: [customer_id], references: [id])
+  user     User      @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  customer Customer? @relation(fields: [customer_id], references: [id], onDelete: SetNull)
 
   items        SaleItem[]
   payments     Payment[]
@@ -350,8 +350,8 @@ model SaleItem {
   discount_amount Decimal @default(0) @db.Decimal(10, 2)
   total           Decimal @db.Decimal(10, 2)
 
-  sale    Sale           @relation(fields: [sale_id], references: [id])
-  variant ProductVariant @relation(fields: [variant_id], references: [id])
+  sale    Sale           @relation(fields: [sale_id], references: [id], onDelete: Restrict)
+  variant ProductVariant @relation(fields: [variant_id], references: [id], onDelete: Restrict)
 
   @@index([sale_id])
   @@index([variant_id])
@@ -372,7 +372,7 @@ model Payment {
 
   created_at DateTime @default(now())
 
-  sale Sale @relation(fields: [sale_id], references: [id])
+  sale Sale @relation(fields: [sale_id], references: [id], onDelete: Restrict)
 
   @@index([sale_id])
   @@index([method])
@@ -403,10 +403,10 @@ model StockLedger {
 
   created_at DateTime @default(now())
 
-  variant    ProductVariant   @relation(fields: [variant_id], references: [id])
-  sale       Sale?            @relation(fields: [sale_id], references: [id])
-  purchase   Purchase?        @relation(fields: [purchase_id], references: [id])
-  adjustment StockAdjustment? @relation(fields: [adjustment_id], references: [id])
+  variant    ProductVariant   @relation(fields: [variant_id], references: [id], onDelete: Restrict)
+  sale       Sale?            @relation(fields: [sale_id], references: [id], onDelete: SetNull)
+  purchase   Purchase?        @relation(fields: [purchase_id], references: [id], onDelete: SetNull)
+  adjustment StockAdjustment? @relation(fields: [adjustment_id], references: [id], onDelete: SetNull)
 
   @@index([variant_id])
   @@index([variant_id, created_at])
@@ -428,7 +428,7 @@ model StockAdjustment {
 
   created_at DateTime @default(now())
 
-  adjustedByUser User @relation(fields: [adjusted_by], references: [id])
+  adjustedByUser User @relation(fields: [adjusted_by], references: [id], onDelete: Restrict)
 
   items        StockAdjustmentItem[]
   stockLedgers StockLedger[]
@@ -446,8 +446,8 @@ model StockAdjustmentItem {
   quantity  Int
   note      String?
 
-  adjustment StockAdjustment @relation(fields: [adjustment_id], references: [id])
-  variant    ProductVariant  @relation(fields: [variant_id], references: [id])
+  adjustment StockAdjustment @relation(fields: [adjustment_id], references: [id], onDelete: Restrict)
+  variant    ProductVariant  @relation(fields: [variant_id], references: [id], onDelete: Restrict)
 
   @@index([adjustment_id])
   @@index([variant_id])

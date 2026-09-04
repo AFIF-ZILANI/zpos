@@ -1,13 +1,15 @@
 import { Hono } from "hono";
+import type { AppEnv } from "@/types";
 import { categoryController } from "@/controllers/category.controller";
 import { validate } from "@/middleware/validate.middleware";
-import { updateCategorySchema } from "@myapp/shared/schemas/category.schema";
+import { requireRole } from "@/middleware/requireRole.middleware";
+import { categorySchema, updateCategorySchema } from "@myapp/shared/schemas/category.schema";
 
-const categoryRouter = new Hono();
+const categoryRouter = new Hono<AppEnv>();
 
-categoryRouter.post("/create", categoryController.createCategory);
+categoryRouter.post("/create", validate(categorySchema), categoryController.createCategory);
 categoryRouter.get("/get/all", categoryController.getCategories);
 categoryRouter.patch("/update", validate(updateCategorySchema), categoryController.updateCategory);
-categoryRouter.delete("/delete", categoryController.deleteCategory);
+categoryRouter.delete("/delete", requireRole("OWNER"), categoryController.deleteCategory);
 
 export default categoryRouter;

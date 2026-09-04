@@ -66,6 +66,12 @@ export const zodUUIDArray = z.array(zodUUID);
 export const zodUUIDOptional = z.string().uuid().optional();
 export const zodDate = z.coerce.date();
 
+// Shared body shape for the many "act on one record by id" mutation
+// endpoints (deletes, toggles, cancels) so they go through the same
+// validation layer instead of ad-hoc c.req.json() checks.
+export const idBodySchema = z.object({ id: zodUUID });
+export type IdBody = z.infer<typeof idBodySchema>;
+
 export const uuidOptional = z.preprocess(
     (val) => (val === "" ? undefined : val),
     z.string().uuid().optional()

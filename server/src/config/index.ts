@@ -4,6 +4,8 @@ const REQUIRED_ENV_VARS = [
     "DATABASE_URL",
     "CLERK_SECRET_KEY",
     "RESEND_API_KEY",
+    "CLIENT_URL",
+    "EMAIL_DOMAIN",
 ] as const;
 
 export function validateEnv(): void {

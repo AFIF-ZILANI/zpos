@@ -7,7 +7,7 @@ import { rateLimiter } from 'hono-rate-limiter'
 import { csrf } from 'hono/csrf'
 import { HTTPException } from 'hono/http-exception'
 import { AppError } from '@/utils/AppError'
-import { sendError } from '@/utils/response'
+import { sendError, sendSuccess } from '@/utils/response'
 import productRouter from './routes/product.route'
 import categoryRouter from './routes/category.route'
 import purchaseRouter from './routes/purchase.route'
@@ -83,6 +83,11 @@ app.get('/health', (c) =>
 // --- Auth middleware for all /api/* routes ---
 // Must be registered BEFORE app.route() calls
 app.use('/api/*', requireAuth, syncUser)
+
+// --- Current user (so the client can gate role-only UI, e.g. /admin) ---
+app.get('/api/me', (c) =>
+    sendSuccess(c, { userId: c.get('userId'), role: c.get('userRole') })
+)
 
 // --- Auth test (useful during development) ---
 if (isDev) {

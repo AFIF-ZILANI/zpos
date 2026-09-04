@@ -3,7 +3,9 @@ import type { AppEnv } from "@/types";
 import prisma from "@/lib/prisma";
 import { sendError, sendSuccess } from "@/utils/response";
 import type { InviteInput, UpdateInput } from "@myapp/shared/schemas/admin.schema";
+import type { IdBody } from "@myapp/shared/schemas/helper";
 import { InviteStatus } from "generated/prisma";
+import { sendInviteEmail } from "@/services/invite.service";
 
 
 export const AdminController = {
@@ -38,6 +40,11 @@ export const AdminController = {
             return sendError(c, "This email is already registered", "CONFLICT", 409);
         }
 
+        const inviter = await prisma.user.findUnique({
+            where: { id: c.get("userId") },
+            select: { name: true, email: true },
+        });
+
         await prisma.user.create({
             data: {
                 email,
@@ -47,6 +54,18 @@ export const AdminController = {
                 is_active: true,
             }
         });
+
+        // Access has already been granted at this point — a failed email is a
+        // notification problem, not a reason to fail the invite itself.
+        try {
+            await sendInviteEmail({
+                toEmail: email,
+                invitedBy: inviter?.name || inviter?.email || "A team member",
+                role,
+            });
+        } catch (err) {
+            console.error("[admin.invite] Failed to send invite email:", err);
+        }
 
         return sendSuccess(c, {}, "User invited successfully", 201);
     },
@@ -92,9 +111,8 @@ export const AdminController = {
         return sendSuccess(c, null, "User deactivated", 200);
     },
     async cancelInvite(c: Context<AppEnv>) {
-        const { id }: { id: string } = await c.req.json();
+        const { id } = c.get("validatedBody") as IdBody;
 
-        console.log(id);
         const user = await prisma.user.findUnique({ where: { id } });
 
         if (!user) {

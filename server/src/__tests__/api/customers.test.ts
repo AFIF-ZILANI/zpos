@@ -133,7 +133,7 @@ describe('PATCH /api/customers/toggle-status', () => {
         })
 
         const res = await patch(app, '/api/customers/toggle-status', {
-            id: 'cust-uuid-1',
+            id: VALID_UUID,
         })
         expect(res.status).toBe(200)
     })

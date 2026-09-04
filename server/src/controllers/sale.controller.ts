@@ -25,10 +25,12 @@ function calcLineDiscount(
     quantity: number,
     discount: { type: "percent" | "fixed"; amount: number }
 ): number {
+    const lineGross = sellPrice * quantity;
     if (discount.type === "percent") {
-        return +(sellPrice * quantity * (discount.amount / 100)).toFixed(2);
+        const pct = Math.min(discount.amount, 100);
+        return +(lineGross * (pct / 100)).toFixed(2);
     }
-    return +Math.min(discount.amount, sellPrice * quantity).toFixed(2);
+    return +Math.min(discount.amount, lineGross).toFixed(2);
 }
 
 function toPaymentMethod(method: string) {
@@ -335,6 +337,17 @@ export const SaleController = {
         const total = +(subtotal - totalDiscountAmount + taxAmount).toFixed(2);
         const paidAmount = checkout.status === "DUE" ? 0 : checkout.paidAmount;
 
+        // paidAmount is client-supplied — validate against the total we just
+        // computed server-side from cart pricing, not the client's own total.
+        if (paidAmount > total) {
+            return sendError(
+                c,
+                "Paid amount exceeds sale total",
+                "INVALID_PAYMENT_AMOUNT",
+                422
+            );
+        }
+
         // ── 5. Customer upsert — outside transaction ───────────────────────────
         const customerRecord = await prisma.customer.upsert({
             where: { phone: checkout.customer.phone },
@@ -356,53 +369,40 @@ export const SaleController = {
         await prisma.$transaction(async (tx) => {
 
             // 6a. Lock variant rows to serialize concurrent stock writes.
-            //     FIX: cast JS string[] to uuid[] explicitly — Prisma sends text[]
-            //     by default, but the column is uuid, causing "operator does not exist"
-
-            //         const lockedVariants = await tx.$queryRaw<
-            //             Array<{ id: string; name: string | null; product_name: string }>
-            //         >(
-            //             Prisma.sql`
-            //     SELECT pv.id, pv.name, p.name AS product_name
-            //     FROM product_variants pv
-            //     JOIN products p ON p.id = pv.product_id
-            //     WHERE pv.id IN (${Prisma.join(variantIds.map((id) => Prisma.sql`${id}::uuid`))})
-            //     FOR UPDATE
-            // `
-            //         );
-
-            const lockedVariants = await tx.productVariant.findMany({
-                where: { id: { in: variantIds } },
-                select: { id: true, name: true, product: { select: { name: true } } },
-            });
+            //     product_variants.id is TEXT (not uuid) — no cast needed. The
+            //     prior ::uuid cast compared a uuid against a text column, which
+            //     is what caused "operator does not exist".
+            const lockedVariants = await tx.$queryRaw<
+                Array<{ id: string; name: string | null; product_name: string }>
+            >(
+                Prisma.sql`
+                    SELECT pv.id, pv.name, p.name AS product_name
+                    FROM product_variants pv
+                    JOIN products p ON p.id = pv.product_id
+                    WHERE pv.id IN (${Prisma.join(variantIds)})
+                    FOR UPDATE OF pv
+                `
+            );
 
             if (lockedVariants.length !== variantIds.length) {
                 throw new AppError("One or more variants not found", "VARIANT_NOT_FOUND", 422);
             }
 
             const variantMeta = new Map(
-                lockedVariants.map((v) => [v.id, { name: v.name, productName: v.product?.name }])
+                lockedVariants.map((v) => [v.id, { name: v.name, productName: v.product_name }])
             );
 
             // 6b. Read current stock balances — inside the lock, authoritative
-            //     FIX: same uuid[] cast required here too
-            //         const latestLedgerEntries = await tx.$queryRaw<
-            //             Array<{ variant_id: string; balance_after: number }>
-            //         >(
-            //             Prisma.sql`
-            //     SELECT DISTINCT ON (variant_id) variant_id, balance_after
-            //     FROM stock_ledgers
-            //     WHERE variant_id IN (${Prisma.join(variantIds.map((id) => Prisma.sql`${id}::uuid`))})
-            //     ORDER BY variant_id, created_at DESC
-            // `
-            //         );
-
-            const latestLedgerEntries = await tx.stockLedger.findMany({
-                where: { variant_id: { in: variantIds } },
-                orderBy: { created_at: "desc" },
-                distinct: ["variant_id"],
-                select: { variant_id: true, balance_after: true },
-            });
+            const latestLedgerEntries = await tx.$queryRaw<
+                Array<{ variant_id: string; balance_after: number }>
+            >(
+                Prisma.sql`
+                    SELECT DISTINCT ON (variant_id) variant_id, balance_after
+                    FROM stock_ledgers
+                    WHERE variant_id IN (${Prisma.join(variantIds)})
+                    ORDER BY variant_id, created_at DESC
+                `
+            );
 
             const stockMap = new Map(
                 latestLedgerEntries.map((e) => [e.variant_id, Number(e.balance_after)])
@@ -825,48 +825,47 @@ export const SaleController = {
             return sendError(c, "Invalid payment method", "INVALID_REQUEST", 422);
         }
 
-        const sale = await prisma.sale.findUnique({
-            where: { id: saleId },
-            select: {
-                id: true,
-                invoice_number: true,
-                payments: true,
-                total: true,
-                customer: {
-                    select: {
-                        name: true,
-                        phone: true,
-                        email: true,
-                        address: true,
-                    },
-                },
+        const result = await prisma.$transaction(async (tx) => {
+            // Lock the sale row so concurrent payment requests serialize —
+            // otherwise two requests can both read the same prior-paid sum,
+            // both pass the "doesn't exceed total" check, and both insert.
+            const locked = await tx.$queryRaw<Array<{ id: string }>>(
+                Prisma.sql`SELECT id FROM sales WHERE id = ${saleId} FOR UPDATE`
+            );
+
+            if (locked.length === 0) {
+                throw new AppError("Sale not found", "NOT_FOUND", 404);
             }
+
+            const sale = await tx.sale.findUnique({
+                where: { id: saleId },
+                select: { id: true, total: true, payments: true },
+            });
+
+            if (!sale) {
+                throw new AppError("Sale not found", "NOT_FOUND", 404);
+            }
+
+            const paidAmount = sale.payments.reduce(
+                (sum, p) => sum.add(p.amount),
+                new Decimal(0)
+            );
+
+            if (paidAmount.add(new Decimal(amount)).gt(sale.total)) {
+                throw new AppError("Payment amount exceeds total amount", "INVALID_REQUEST", 422);
+            }
+
+            await tx.payment.create({
+                data: {
+                    sale_id: saleId,
+                    amount: new Decimal(amount),
+                    method: method,
+                    reference: reference,
+                }
+            });
         });
 
-        if (!sale) {
-            return sendError(c, "Sale not found", "NOT_FOUND", 404);
-        }
-
-        const paidAmount = sale.payments.reduce(
-            (sum, p) => sum.add(p.amount),
-            new Decimal(0)
-        );
-
-        if (paidAmount.add(new Decimal(amount)).gt(sale.total)) {
-            return sendError(c, "Payment amount exceeds total amount", "INVALID_REQUEST", 422);
-        }
-
-        await prisma.payment.create({
-            data: {
-                sale_id: saleId,
-                amount: new Decimal(amount),
-                method: method,
-                reference: reference,
-            }
-        })
-
-
-        return sendSuccess(c, {}, "Payment data fetched successfully", 200);
+        return sendSuccess(c, result, "Payment recorded successfully", 200);
     }
 
 }

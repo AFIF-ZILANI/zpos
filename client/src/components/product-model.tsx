@@ -69,7 +69,6 @@ export function ProductModal({
   });
 
   async function onSubmit(values: CreateProduct) {
-    console.log(JSON.stringify(values, null, 2));
     createProduct(values, {
       onSuccess: () => {
         toast.success("Product created successfully");
@@ -82,9 +81,6 @@ export function ProductModal({
     });
   }
 
-  function onError(error: unknown) {
-    console.log(error);
-  }
 
   return (
     <Dialog>
@@ -104,7 +100,7 @@ export function ProductModal({
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(onSubmit, onError)}
+            onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-6"
           >
             {/* Basic Info */}

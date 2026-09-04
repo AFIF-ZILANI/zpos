@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { normalizeProductName } from "@/lib/product-name-normalizer";
 import type { CreateProduct, CreateProductVariantSepa, UpdateProduct, UpdateProductVariant } from "@myapp/shared/schemas/product.schema";
+import type { IdBody } from "@myapp/shared/schemas/helper";
 import { ProductService } from "@/services/product.service";
 import type { CartEntryProduct, ProductStatus, TProduct } from "@/types";
 import { sendError, sendSuccess } from "@/utils/response";
@@ -107,10 +108,7 @@ export const ProductController = {
         return sendSuccess(c, {}, "Product updated successfully", 200);
     },
     async deleteById(c: Context) {
-        const { id } = await c.req.json();
-        if (!id || typeof id !== "string" || id.trim() === "") {
-            return sendError(c, "Invalid ID", "BAD_REQUEST", 400);
-        }
+        const { id } = c.get("validatedBody") as IdBody;
 
         const product = await prisma.product.findUnique({
             where: { id },
@@ -123,20 +121,37 @@ export const ProductController = {
 
         const variantIds = product.variants.map((v) => v.id);
 
+        // A product with any purchase/sale/stock history can't be hard-deleted
+        // without destroying financial records and the append-only stock
+        // ledger — deactivate it instead so history stays intact.
+        const [ledgerCount, saleItemCount, purchaseItemCount] = await Promise.all([
+            prisma.stockLedger.count({ where: { variant_id: { in: variantIds } } }),
+            prisma.saleItem.count({ where: { variant_id: { in: variantIds } } }),
+            prisma.purchaseItem.count({ where: { variant_id: { in: variantIds } } }),
+        ]);
+
+        if (ledgerCount > 0 || saleItemCount > 0 || purchaseItemCount > 0) {
+            await prisma.$transaction([
+                prisma.productVariant.updateMany({
+                    where: { id: { in: variantIds } },
+                    data: { is_active: false },
+                }),
+                prisma.product.update({
+                    where: { id },
+                    data: { is_active: false },
+                }),
+            ]);
+
+            return sendSuccess(
+                c,
+                {},
+                "Product has purchase or sale history — deactivated instead of deleted",
+                200
+            );
+        }
+
         await prisma.$transaction(async (tx) => {
             await tx.variantBarcodeAllocation.deleteMany({
-                where: { variant_id: { in: variantIds } },
-            });
-
-            await tx.stockLedger.deleteMany({
-                where: { variant_id: { in: variantIds } },
-            });
-
-            await tx.purchaseItem.deleteMany({
-                where: { variant_id: { in: variantIds } },
-            });
-
-            await tx.saleItem.deleteMany({
                 where: { variant_id: { in: variantIds } },
             });
 
@@ -291,11 +306,7 @@ export const ProductController = {
     },
 
     async toggleVariantById(c: Context) {
-        const { id } = await c.req.json();
-
-        if (!id || typeof id !== "string" || id.trim() === "") {
-            return sendError(c, "Invalid ID", "BAD_REQUEST", 400);
-        }
+        const { id } = c.get("validatedBody") as IdBody;
 
         const variant = await prisma.productVariant.findUnique({
             where: { id },
