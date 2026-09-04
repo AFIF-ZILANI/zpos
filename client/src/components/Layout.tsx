@@ -32,6 +32,9 @@ const navItems = [
   // { path: "/analytics", label: "Analytics", icon: BarChart3 },
   { path: "/sales", label: "Sales", icon: ShoppingCart },
   // { path: "/settings", label: "Settings", icon: Settings },
+];
+
+const ownerOnlyNavItems = [
   { path: "/admin", label: "Admin", icon: User2Icon },
 ];
 
@@ -72,8 +75,15 @@ function NavItem({
   );
 }
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout({
+  children,
+  isOwner,
+}: {
+  children: React.ReactNode;
+  isOwner?: boolean;
+}) {
   const [collapsed, setCollapsed] = useState(false);
+  const visibleNavItems = isOwner ? [...navItems, ...ownerOnlyNavItems] : navItems;
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar */}
@@ -103,7 +113,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavItem key={item.path} {...item} collapsed={collapsed} />
           ))}
         </nav>

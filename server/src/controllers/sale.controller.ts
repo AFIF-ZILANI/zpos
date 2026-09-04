@@ -335,6 +335,17 @@ export const SaleController = {
         const total = +(subtotal - totalDiscountAmount + taxAmount).toFixed(2);
         const paidAmount = checkout.status === "DUE" ? 0 : checkout.paidAmount;
 
+        // paidAmount is client-supplied — validate against the total we just
+        // computed server-side from cart pricing, not the client's own total.
+        if (paidAmount > total) {
+            return sendError(
+                c,
+                "Paid amount exceeds sale total",
+                "INVALID_PAYMENT_AMOUNT",
+                422
+            );
+        }
+
         // ── 5. Customer upsert — outside transaction ───────────────────────────
         const customerRecord = await prisma.customer.upsert({
             where: { phone: checkout.customer.phone },
