@@ -57,3 +57,4 @@ desktop.ini
 *.local
 *.tgz
 /graphify-out/
+.superpowers/
