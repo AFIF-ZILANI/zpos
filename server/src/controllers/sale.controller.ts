@@ -356,53 +356,40 @@ export const SaleController = {
         await prisma.$transaction(async (tx) => {
 
             // 6a. Lock variant rows to serialize concurrent stock writes.
-            //     FIX: cast JS string[] to uuid[] explicitly — Prisma sends text[]
-            //     by default, but the column is uuid, causing "operator does not exist"
-
-            //         const lockedVariants = await tx.$queryRaw<
-            //             Array<{ id: string; name: string | null; product_name: string }>
-            //         >(
-            //             Prisma.sql`
-            //     SELECT pv.id, pv.name, p.name AS product_name
-            //     FROM product_variants pv
-            //     JOIN products p ON p.id = pv.product_id
-            //     WHERE pv.id IN (${Prisma.join(variantIds.map((id) => Prisma.sql`${id}::uuid`))})
-            //     FOR UPDATE
-            // `
-            //         );
-
-            const lockedVariants = await tx.productVariant.findMany({
-                where: { id: { in: variantIds } },
-                select: { id: true, name: true, product: { select: { name: true } } },
-            });
+            //     product_variants.id is TEXT (not uuid) — no cast needed. The
+            //     prior ::uuid cast compared a uuid against a text column, which
+            //     is what caused "operator does not exist".
+            const lockedVariants = await tx.$queryRaw<
+                Array<{ id: string; name: string | null; product_name: string }>
+            >(
+                Prisma.sql`
+                    SELECT pv.id, pv.name, p.name AS product_name
+                    FROM product_variants pv
+                    JOIN products p ON p.id = pv.product_id
+                    WHERE pv.id IN (${Prisma.join(variantIds)})
+                    FOR UPDATE OF pv
+                `
+            );
 
             if (lockedVariants.length !== variantIds.length) {
                 throw new AppError("One or more variants not found", "VARIANT_NOT_FOUND", 422);
             }
 
             const variantMeta = new Map(
-                lockedVariants.map((v) => [v.id, { name: v.name, productName: v.product?.name }])
+                lockedVariants.map((v) => [v.id, { name: v.name, productName: v.product_name }])
             );
 
             // 6b. Read current stock balances — inside the lock, authoritative
-            //     FIX: same uuid[] cast required here too
-            //         const latestLedgerEntries = await tx.$queryRaw<
-            //             Array<{ variant_id: string; balance_after: number }>
-            //         >(
-            //             Prisma.sql`
-            //     SELECT DISTINCT ON (variant_id) variant_id, balance_after
-            //     FROM stock_ledgers
-            //     WHERE variant_id IN (${Prisma.join(variantIds.map((id) => Prisma.sql`${id}::uuid`))})
-            //     ORDER BY variant_id, created_at DESC
-            // `
-            //         );
-
-            const latestLedgerEntries = await tx.stockLedger.findMany({
-                where: { variant_id: { in: variantIds } },
-                orderBy: { created_at: "desc" },
-                distinct: ["variant_id"],
-                select: { variant_id: true, balance_after: true },
-            });
+            const latestLedgerEntries = await tx.$queryRaw<
+                Array<{ variant_id: string; balance_after: number }>
+            >(
+                Prisma.sql`
+                    SELECT DISTINCT ON (variant_id) variant_id, balance_after
+                    FROM stock_ledgers
+                    WHERE variant_id IN (${Prisma.join(variantIds)})
+                    ORDER BY variant_id, created_at DESC
+                `
+            );
 
             const stockMap = new Map(
                 latestLedgerEntries.map((e) => [e.variant_id, Number(e.balance_after)])
