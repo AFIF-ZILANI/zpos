@@ -1,24 +1,11 @@
 import type { Context } from "hono";
 import { sendError, sendSuccess } from "@/utils/response";
 import prisma from "@/lib/prisma";
-import type { UpdateCategory } from "@myapp/shared/schemas/category.schema";
+import type { CategoryFormValues, UpdateCategory } from "@myapp/shared/schemas/category.schema";
 
 export const categoryController = {
     async createCategory(c: Context) {
-        const body = await c.req.json();
-        const { name, description, parent_id } = body;
-
-        if (!name || typeof name !== "string" || name.trim().length === 0) {
-            return sendError(c, "Category name is required", "INVALID_INPUT", 400);
-        }
-
-        if (parent_id && typeof parent_id !== "string" && parent_id.trim().length === 0) {
-            return sendError(c, "Parent ID must be a string", "INVALID_INPUT", 400);
-        }
-
-        if (description && typeof description !== "string" && description.trim().length === 0) {
-            return sendError(c, "Description must be a string", "INVALID_INPUT", 400);
-        }
+        const { name, description, parent_id } = c.get("validatedBody") as CategoryFormValues;
 
         const existingCategory = await prisma.category.findFirst({
             where: {

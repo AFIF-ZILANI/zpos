@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { normalizeProductName } from "@/lib/product-name-normalizer";
 import type { CreateProduct, CreateProductVariantSepa, UpdateProduct, UpdateProductVariant } from "@myapp/shared/schemas/product.schema";
+import type { IdBody } from "@myapp/shared/schemas/helper";
 import { ProductService } from "@/services/product.service";
 import type { CartEntryProduct, ProductStatus, TProduct } from "@/types";
 import { sendError, sendSuccess } from "@/utils/response";
@@ -107,10 +108,7 @@ export const ProductController = {
         return sendSuccess(c, {}, "Product updated successfully", 200);
     },
     async deleteById(c: Context) {
-        const { id } = await c.req.json();
-        if (!id || typeof id !== "string" || id.trim() === "") {
-            return sendError(c, "Invalid ID", "BAD_REQUEST", 400);
-        }
+        const { id } = c.get("validatedBody") as IdBody;
 
         const product = await prisma.product.findUnique({
             where: { id },
@@ -308,11 +306,7 @@ export const ProductController = {
     },
 
     async toggleVariantById(c: Context) {
-        const { id } = await c.req.json();
-
-        if (!id || typeof id !== "string" || id.trim() === "") {
-            return sendError(c, "Invalid ID", "BAD_REQUEST", 400);
-        }
+        const { id } = c.get("validatedBody") as IdBody;
 
         const variant = await prisma.productVariant.findUnique({
             where: { id },

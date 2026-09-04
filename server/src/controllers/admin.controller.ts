@@ -3,6 +3,7 @@ import type { AppEnv } from "@/types";
 import prisma from "@/lib/prisma";
 import { sendError, sendSuccess } from "@/utils/response";
 import type { InviteInput, UpdateInput } from "@myapp/shared/schemas/admin.schema";
+import type { IdBody } from "@myapp/shared/schemas/helper";
 import { InviteStatus } from "generated/prisma";
 
 
@@ -92,9 +93,8 @@ export const AdminController = {
         return sendSuccess(c, null, "User deactivated", 200);
     },
     async cancelInvite(c: Context<AppEnv>) {
-        const { id }: { id: string } = await c.req.json();
+        const { id } = c.get("validatedBody") as IdBody;
 
-        console.log(id);
         const user = await prisma.user.findUnique({ where: { id } });
 
         if (!user) {

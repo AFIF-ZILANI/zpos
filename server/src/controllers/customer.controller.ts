@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import prisma from "@/lib/prisma";
 import type { CustomerTableData } from "@/types";
 import type { CreateCustomer, UpdateCustomer } from "@myapp/shared/schemas/customer.schema";
+import type { IdBody } from "@myapp/shared/schemas/helper";
 
 export const customerController = {
     getAllCustomers: async (c: Context) => {
@@ -191,11 +192,7 @@ export const customerController = {
         return sendSuccess(c, result, "Customer updated successfully", 200);
     },
     toggleCustomerStatus: async (c: Context) => {
-        const { id } = await c.req.json()
-
-        if (!id || typeof id !== "string" || id.trim() === "") {
-            return sendError(c, "Customer ID is required", "CUSTOMER_ID_REQUIRED", 400);
-        }
+        const { id } = c.get("validatedBody") as IdBody;
 
         const result = await prisma.$transaction(async (tx) => {
             const customer = await tx.customer.findUnique({
