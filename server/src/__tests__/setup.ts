@@ -12,15 +12,16 @@ import adminRouter from '@/routes/admin.route'
 import type { AppEnv } from '@/types'
 
 // Creates a test version of the app that bypasses Clerk auth
-// Always injects OWNER role context — covers the majority of business logic tests
-export function createTestApp() {
+// Defaults to OWNER role — covers the majority of business logic tests.
+// Pass 'STAFF' to test role-gated (requireRole) rejection paths.
+export function createTestApp(role: 'OWNER' | 'STAFF' = 'OWNER') {
     const app = new Hono<AppEnv>()
 
     // Stub auth: skip Clerk verification, inject test user into context
     app.use('/api/*', async (c, next) => {
         c.set('clerkUserId', 'clerk_test_user_id')
         c.set('userId', 'test-user-uuid')
-        c.set('userRole', 'OWNER')
+        c.set('userRole', role)
         await next()
     })
 
