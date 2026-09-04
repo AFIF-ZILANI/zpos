@@ -164,6 +164,94 @@ describe('POST /api/sales/payment/create', () => {
     })
 })
 
+// ── createSale ───────────────────────────────────────────────────────────────
+
+const VARIANT_ID = '550e8400-e29b-41d4-a716-446655440030'
+const BARCODE = '2001000000017'
+
+const VALID_CHECKOUT_BODY = {
+    cartItems: [
+        {
+            variantId: VARIANT_ID,
+            quantity: 2,
+            barcode: BARCODE,
+            discount: { type: 'fixed', amount: 0 },
+        },
+    ],
+    totalAmount: 40,
+    checkout: {
+        method: 'CASH',
+        status: 'PAID',
+        paidAmount: 40,
+        customer: { name: 'John Doe', phone: '01700000001', email: '', address: '' },
+    },
+}
+
+function mockHappyPathUpToLock() {
+    mockPrisma.barcode.findMany.mockResolvedValueOnce([{ id: 'bc-1', code: BARCODE }])
+    mockPrisma.variantBarcodeAllocation.findMany.mockResolvedValueOnce([
+        { barcode_id: 'bc-1', variant_id: VARIANT_ID, purchaseItem: { sell_price: 20 } },
+    ])
+    mockPrisma.customer.upsert.mockResolvedValueOnce({ id: 'cust-1' })
+}
+
+describe('POST /api/sales/create', () => {
+    it('returns 422 when a barcode does not resolve to a purchased unit', async () => {
+        mockPrisma.barcode.findMany.mockResolvedValueOnce([]) // barcode not found
+
+        const res = await post(app, '/api/sales/create', VALID_CHECKOUT_BODY)
+        expect(res.status).toBe(422)
+    })
+
+    it('rejects checkout when requested quantity exceeds locked stock', async () => {
+        mockHappyPathUpToLock()
+        // 6a: lock query, 6b: balance read — both go through tx.$queryRaw
+        mockPrisma.$queryRaw
+            .mockResolvedValueOnce([{ id: VARIANT_ID, name: 'Red', product_name: 'T-Shirt' }])
+            .mockResolvedValueOnce([{ variant_id: VARIANT_ID, balance_after: 1 }]) // only 1 in stock, cart wants 2
+
+        const res = await post(app, '/api/sales/create', VALID_CHECKOUT_BODY)
+        expect(res.status).toBe(422)
+
+        // Must never reach the point of creating a sale on insufficient stock
+        expect(mockPrisma.sale.create.mock.calls.length).toBe(0)
+    })
+
+    it('rejects paidAmount that exceeds the server-computed total, even if it matches the client-sent totalAmount', async () => {
+        mockHappyPathUpToLock()
+
+        // Cart really totals 40 (2 x sell_price 20), but the client claims a
+        // much higher totalAmount/paidAmount — the old bug trusted this.
+        const res = await post(app, '/api/sales/create', {
+            ...VALID_CHECKOUT_BODY,
+            totalAmount: 1000,
+            checkout: { ...VALID_CHECKOUT_BODY.checkout, paidAmount: 1000 },
+        })
+        expect(res.status).toBe(422)
+        expect(mockPrisma.sale.create.mock.calls.length).toBe(0)
+    })
+
+    it('creates a sale and a matching stock ledger entry on the happy path', async () => {
+        mockHappyPathUpToLock()
+        mockPrisma.$queryRaw
+            .mockResolvedValueOnce([{ id: VARIANT_ID, name: 'Red', product_name: 'T-Shirt' }])
+            .mockResolvedValueOnce([{ variant_id: VARIANT_ID, balance_after: 10 }])
+        mockPrisma.counter.update.mockResolvedValueOnce({ key: 'invoice', value: 42 })
+        mockPrisma.sale.create.mockResolvedValueOnce({ id: 'sale-1', invoice_number: 'INV-2026-000042' })
+
+        const res = await post(app, '/api/sales/create', VALID_CHECKOUT_BODY)
+        expect(res.status).toBe(201)
+
+        expect(mockPrisma.sale.create.mock.calls.length).toBe(1)
+        const saleData = mockPrisma.sale.create.mock.calls[0]?.[0].data
+        expect(Number(saleData.total)).toBe(40)
+
+        const ledgerCall = mockPrisma.stockLedger.createMany.mock.calls[0]?.[0].data
+        expect(ledgerCall[0].quantity).toBe(2)
+        expect(ledgerCall[0].balance_after).toBe(8) // 10 in stock - 2 sold
+    })
+})
+
 // ── getChartData ──────────────────────────────────────────────────────────────
 
 describe('GET /api/sales/get/chart', () => {
