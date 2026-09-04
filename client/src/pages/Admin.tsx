@@ -130,19 +130,6 @@ export default function AdminPage() {
     );
   };
 
-  // const changeRole = (user: Admin, newRole: "OWNER" | "STAFF") => {
-  //   update(
-  //     { id: user.id, role: newRole },
-  //     {
-  //       onSuccess: () => {
-  //         toast.success("Role updated successfully");
-  //         refetch();
-  //       },
-  //       onError: (err) => toast.error(err.message),
-  //     },
-  //   );
-  // };
-
   const handleEditUser = (user: Admin) => {
     setEditingUser(user);
     setName(user.name || "");

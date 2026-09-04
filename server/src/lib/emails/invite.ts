@@ -1,3 +1,12 @@
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+}
+
 export function inviteEmailHtml({
     invitedBy,
     role,
@@ -7,13 +16,15 @@ export function inviteEmailHtml({
     role: string
     loginUrl: string
 }) {
+    const safeInvitedBy = escapeHtml(invitedBy)
+    const safeRole = escapeHtml(role)
     return `
     <!DOCTYPE html>
     <html>
       <body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
         <h2>You're invited to Sabbirs Point zPOS</h2>
         <p>Hi there,</p>
-        <p><strong>${invitedBy}</strong> has invited you to join as a <strong>${role}</strong>.</p>
+        <p><strong>${safeInvitedBy}</strong> has invited you to join as a <strong>${safeRole}</strong>.</p>
         <p>Click the button below to login and get started:</p>
         
           <a href="${loginUrl}"
