@@ -392,7 +392,7 @@ export default function Dashboard() {
                         {formatCurrencyInBDT(p.revenue)}
                       </p>
                       <p
-                        className={`text-xs font-medium ${p.trend.startsWith("+") ? "text-green-600" : "text-red-500"}`}
+                        className={`text-xs font-medium ${p.trend.startsWith("+") ? "text-success" : "text-destructive"}`}
                       >
                         {p.trend}
                       </p>

@@ -539,7 +539,7 @@ export default function PointOfSale() {
                                 <span className="text-[11px] text-muted-foreground/60 line-through tabular-nums">
                                   {BDT(item.product.price)}
                                 </span>
-                                <span className="text-[11px] text-emerald-600 font-medium tabular-nums">
+                                <span className="text-[11px] text-success font-medium tabular-nums">
                                   {BDT(unitDisc)}
                                 </span>
                               </>
@@ -602,7 +602,7 @@ export default function PointOfSale() {
                           <span className="flex items-center gap-1.5">
                             <Tag className="w-3 h-3" />
                             {hasDiscount ? (
-                              <span className="text-emerald-600 font-medium">
+                              <span className="text-success font-medium">
                                 {discount.type === "percent"
                                   ? `${discount.amount}% off`
                                   : `${BDT(discount.amount)} off`}

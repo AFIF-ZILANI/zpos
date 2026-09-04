@@ -241,8 +241,8 @@
   --accent-foreground: 20 65% 70%;
 
   /* ── Destructive ── */
-  --destructive: 0 45% 48%;
-  --destructive-foreground: 38 83% 95%;
+  --destructive: 0 55% 62%;
+  --destructive-foreground: 30 33% 11%;
 
   /* ── Warning ── */
   --warning: 39 67% 55%;
