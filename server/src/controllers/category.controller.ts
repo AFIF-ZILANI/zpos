@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { sendError, sendSuccess } from "@/utils/response";
 import prisma from "@/lib/prisma";
 import type { CategoryFormValues, UpdateCategory } from "@myapp/shared/schemas/category.schema";
+import { AppError } from "@/utils/AppError";
 
 export const categoryController = {
     async createCategory(c: Context) {
@@ -129,13 +130,7 @@ export const categoryController = {
             });
 
             if (hasProductsLinked.length > 0) {
-
-                throw new Error("Category has products linked", {
-                    cause: {
-                        code: "INVALID_INPUT",
-                        statusCode: 400,
-                    }
-                });
+                throw new AppError("Category has products linked", "INVALID_INPUT", 400);
             }
 
             if (childrenIds.length > 0) {
