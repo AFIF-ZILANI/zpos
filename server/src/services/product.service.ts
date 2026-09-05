@@ -131,6 +131,17 @@ export const ProductService = {
             })
             const variants = await Promise.all(
                 data.variants.map((variant) => {
+                    // Build the label from whichever attributes are present.
+                    // Interpolating both unconditionally produced names like
+                    // "undefined - undefined" for a plain product with no
+                    // colour or size. ProductVariant.name is nullable exactly
+                    // for that case, so leave it null rather than inventing a
+                    // label the cashier would see on the POS screen.
+                    const color = variant.color?.trim() || null;
+                    const size = variant.size?.trim() || null;
+                    const name =
+                        [size, color].filter(Boolean).join(" - ") || null;
+
                     return tx.productVariant.create({
                         data: {
                             product: {
@@ -138,9 +149,9 @@ export const ProductService = {
                                     id: product.id,
                                 },
                             },
-                            name: `${variant.size} - ${variant.color}`,
-                            color: variant.color,
-                            size: variant.size,
+                            name,
+                            color,
+                            size,
                         },
                     });
 

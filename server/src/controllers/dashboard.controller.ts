@@ -18,9 +18,19 @@ function pctChange(
   };
 }
 
-function toNumber(val: Decimal | bigint | null | undefined): number {
+function toNumber(
+  val: Decimal | bigint | string | number | null | undefined
+): number {
   if (val == null) return 0;
   if (typeof val === "bigint") return Number(val);
+  // Raw SQL aggregates come back as Decimal under the pg adapter, but the
+  // concrete type depends on the driver, so accept the plain forms too rather
+  // than throwing inside a dashboard request.
+  if (typeof val === "number") return val;
+  if (typeof val === "string") {
+    const n = Number(val);
+    return Number.isFinite(n) ? n : 0;
+  }
   return val.toNumber();
 }
 
@@ -463,24 +473,40 @@ export const DashboardController = {
 `;
 
 
-    // Build a lookup: "YYYY-MM-DD" → row
+    // Build a lookup: "YYYY-MM-DD" → row.
+    //
+    // The key must be derived from local calendar parts, not toISOString().
+    // The week bounds are local midnights, and toISOString() converts to UTC —
+    // at UTC+6 that rolls every day back to the previous date, so no generated
+    // key ever matched a row and the chart always rendered zeros.
+    const dateKey = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate()
+      ).padStart(2, "0")}`;
+
     const rowMap = new Map<string, WeeklyRow>();
     for (const row of rows) {
-      const key = new Date(row.sale_date).toISOString().split("T")[0] || "";
+      // Postgres DATE arrives as UTC midnight, so read it back in UTC.
+      const d = new Date(row.sale_date);
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(
+        2,
+        "0"
+      )}-${String(d.getUTCDate()).padStart(2, "0")}`;
       rowMap.set(key, row);
     }
 
-    // Generate all 7 days SAT→FRI, zero-fill missing days
+    // Generate all 7 days SAT→FRI, zero-fill missing days.
     const result: WeeklySalesEntry[] = [];
 
-    for (let i = 0; i <= 7; i++) {
+    for (let i = 0; i < WEEK_DAYS.length; i++) {
       const day = new Date(weekStart);
       day.setDate(weekStart.getDate() + i);
 
-      const key = day.toISOString().split("T")[0] || "";
-      const row = rowMap.get(key);
+      const row = rowMap.get(dateKey(day));
       result.push({
-        day: WEEK_DAYS[JS_DAY_TO_WEEK_IDX[day.getDay() - 1] as number] || "",
+        // JS_DAY_TO_WEEK_IDX maps getDay() directly; the previous "- 1" shifted
+        // every label one day (Saturday's bar read "FRI", Sunday's was blank).
+        day: WEEK_DAYS[JS_DAY_TO_WEEK_IDX[day.getDay()] as number] || "",
         sales: row ? toNumber(row.revenue) : 0,
         orders: row ? toNumber(row.orders) : 0,
       });

@@ -266,6 +266,17 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
+              {!incomeSalesHistoryFetching &&
+                (salesHistoryData?.length ?? 0) === 0 && (
+                  <div className="px-5 py-10 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No sales in the last 7 days
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Completed sales will appear here as they come in.
+                    </p>
+                  </div>
+                )}
             </div>
           </CardContent>
         </Card>
@@ -325,6 +336,17 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
+              {!incomeTopProductsFetching &&
+                (topProductsData?.length ?? 0) === 0 && (
+                  <div className="px-5 py-10 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No products sold in the last 7 days
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Your best sellers will be ranked here.
+                    </p>
+                  </div>
+                )}
             </div>
           </CardContent>
         </Card>

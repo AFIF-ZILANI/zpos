@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
@@ -34,7 +34,6 @@ import {
   categorySchema,
   type CategoryFormValues,
 } from "@myapp/shared/schemas/category.schema";
-import { ZodError } from "zod";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -174,12 +173,14 @@ export function AddNewCategoryModal({
     });
   }
 
-  const onError = (error: unknown) => {
-    if (error instanceof Error || error instanceof ZodError) {
-      toast.error(error.message);
-    } else {
-      toast.error("An unknown error occurred");
-    }
+  // react-hook-form hands this a FieldErrors object, never an Error, so the
+  // old instanceof checks always fell through to "An unknown error occurred"
+  // and the user never learned which field was wrong.
+  const onError = (errors: FieldErrors<CategoryFormValues>) => {
+    const first = Object.values(errors).find((e) => e?.message)?.message;
+    toast.error(
+      typeof first === "string" ? first : "Please check the form and try again",
+    );
   };
 
   return (

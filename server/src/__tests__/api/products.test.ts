@@ -147,6 +147,77 @@ describe('POST /api/products/create', () => {
         // Depending on how the service validates, could be 201 or 422
         expect([201, 422, 500]).toContain(res.status)
     })
+
+    // ── Regression: a plain product must be creatable ────────────────────────
+    // The variant schema used to require a colour or size on EVERY variant, so
+    // ordinary stock like "Miniket Rice 5kg" or a USB charger could not be
+    // added at all. Worse, the issue path was ["color","size"], which resolves
+    // to `variants.0.color.size` — a path no input owns — so react-hook-form
+    // blocked the submit while rendering no message: the button did nothing.
+    function mockCreateTransaction() {
+        mockPrisma.$transaction.mockImplementationOnce(async (fn: any) =>
+            fn({
+                ...mockPrisma,
+                product: {
+                    ...mockPrisma.product,
+                    create: () => Promise.resolve({ id: 'new-prod', name: 'Rice' }),
+                },
+                productVariant: {
+                    ...mockPrisma.productVariant,
+                    create: (args: any) => Promise.resolve({ id: 'var-1', ...args.data }),
+                },
+            })
+        )
+    }
+
+    const BASE = {
+        name: 'Miniket Rice 5kg',
+        description: '',
+        brand: 'Local',
+        category_id: VALID_UUID,
+        reorder_level: 3,
+    }
+
+    it('accepts a single variant with no colour or size', async () => {
+        mockCreateTransaction()
+        const res = await post(app, '/api/products/create', { ...BASE, variants: [{}] })
+        expect(res.status).toBe(201)
+    })
+
+    it('requires at least one variant', async () => {
+        const res = await post(app, '/api/products/create', { ...BASE, variants: [] })
+        expect(res.status).toBe(422)
+    })
+
+    it('rejects a second variant that has nothing to tell it apart', async () => {
+        const res = await post(app, '/api/products/create', {
+            ...BASE,
+            variants: [{ color: 'Red' }, {}],
+        })
+        expect(res.status).toBe(422)
+
+        const body = await json<{ error: { details: Array<{ field: string }> } }>(res)
+        // Must anchor on a field the form actually renders, otherwise the
+        // message is invisible and the form silently refuses to submit.
+        expect(body.error.details[0]?.field).toBe('variants.1.color')
+    })
+
+    it('rejects duplicate variants', async () => {
+        const res = await post(app, '/api/products/create', {
+            ...BASE,
+            variants: [{ color: 'Red', size: 'M' }, { color: 'red', size: 'm' }],
+        })
+        expect(res.status).toBe(422)
+    })
+
+    it('allows two variants that differ', async () => {
+        mockCreateTransaction()
+        const res = await post(app, '/api/products/create', {
+            ...BASE,
+            variants: [{ color: 'Red', size: 'M' }, { color: 'Blue', size: 'L' }],
+        })
+        expect(res.status).toBe(201)
+    })
 })
 
 describe('PATCH /api/products/update', () => {
