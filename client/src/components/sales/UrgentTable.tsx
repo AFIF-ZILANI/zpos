@@ -8,7 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { RotateCcw, CreditCard } from "lucide-react";
-import { formatCurrencyInBDT, StatusBadgeSales } from "@/lib/utils";
+import { formatCurrencyInBDT } from "@/lib/utils";
+import { StatusBadgeSales } from "@/components/status-badge";
 import Pagination from "../pagination";
 
 interface UrgentTableProps {

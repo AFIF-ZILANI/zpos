@@ -1,13 +1,6 @@
-import { useEffect, useState } from "react";
 import { Link } from "wouter";
 
 export default function NotFound() {
-  const [_, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    setIsVisible(true);
-  }, []);
-
   return (
     <div className="min-h-screen w-full bg-linear-to-br from-neutral-50 via-white to-neutral-100 flex items-center justify-center px-4">
       <style>{`

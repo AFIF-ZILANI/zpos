@@ -184,7 +184,9 @@ export function CheckoutForm({
 
   useEffect(() => {
     if (done && !confirming) {
-      // reset
+      // Full-form reset after a completed sale while the modal stays mounted
+      // for the next transaction — there's no parent-owned key to remount on.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep(0);
       setMethod("CASH");
       setStatus("PAID");
@@ -195,14 +197,15 @@ export function CheckoutForm({
 
   const selectedMethod = METHODS.find((m) => m.id === method)!;
 
-  useEffect(() => {
-    if (total && status === "PAID") {
-      setPaidAmount(total.toString());
-    }
-    if (status === "PARTIAL") {
-      setPaidAmount("");
-    }
-  }, [total, status]);
+  // Keep the cash-received default in sync with `total` while status is PAID,
+  // adjusted during render (React's documented alternative to an effect here)
+  // instead of after commit.
+  const paidSyncKey = `${total}|${status}`;
+  const [prevPaidSyncKey, setPrevPaidSyncKey] = useState(paidSyncKey);
+  if (paidSyncKey !== prevPaidSyncKey) {
+    setPrevPaidSyncKey(paidSyncKey);
+    if (status === "PAID") setPaidAmount(total.toString());
+  }
 
   return (
     <DialogContent className="max-w-sm p-0 overflow-hidden gap-0">

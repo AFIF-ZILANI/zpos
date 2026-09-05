@@ -16,7 +16,7 @@ interface Order {
 
 export default function OrderSummary({ order }: { order: Order }) {
   const getPaymentTermLabel = (term: string) => {
-    const labels: any = {
+    const labels: Record<string, string> = {
       NET_15: "NET 15 (15 days)",
       NET_30: "NET 30 (30 days)",
       NET_45: "NET 45 (45 days)",

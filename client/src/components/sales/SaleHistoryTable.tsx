@@ -10,7 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 // import { Trash2 } from "lucide-react";
-import { formatCurrencyInBDT, StatusBadgeSales } from "@/lib/utils";
+import { formatCurrencyInBDT } from "@/lib/utils";
+import { StatusBadgeSales } from "@/components/status-badge";
 import Pagination from "../pagination";
 import { formatDate } from "date-fns";
 

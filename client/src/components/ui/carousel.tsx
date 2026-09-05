@@ -109,6 +109,9 @@ const Carousel = React.forwardRef<
         return
       }
 
+      // Subscribing to the embla-carousel instance; onSelect's initial call
+      // mirrors the current slide state into React on attach.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       onSelect(api)
       api.on("reInit", onSelect)
       api.on("select", onSelect)

@@ -9,19 +9,19 @@ process.env.EMAIL_DOMAIN = 'test.local'
 process.env.NODE_ENV = 'test'
 
 const makeModel = () => ({
-    findMany: mock(() => Promise.resolve([])),
-    findUnique: mock(() => Promise.resolve(null)),
-    findFirst: mock(() => Promise.resolve(null)),
-    create: mock(() => Promise.resolve({ id: 'test-id' })),
-    createMany: mock(() => Promise.resolve({ count: 1 })),
-    update: mock(() => Promise.resolve({ id: 'test-id' })),
-    updateMany: mock(() => Promise.resolve({ count: 1 })),
-    delete: mock(() => Promise.resolve({ id: 'test-id' })),
-    deleteMany: mock(() => Promise.resolve({ count: 1 })),
-    count: mock(() => Promise.resolve(0)),
-    aggregate: mock(() => Promise.resolve({ _sum: { total: null, amount: null }, _count: { id: 0 } })),
-    upsert: mock(() => Promise.resolve({ id: 'test-id' })),
-    groupBy: mock(() => Promise.resolve([])),
+    findMany: mock((..._args: any[]) => Promise.resolve<any[]>([])),
+    findUnique: mock((..._args: any[]) => Promise.resolve<any>(null)),
+    findFirst: mock((..._args: any[]) => Promise.resolve<any>(null)),
+    create: mock((..._args: any[]) => Promise.resolve<any>({ id: 'test-id' })),
+    createMany: mock((..._args: any[]) => Promise.resolve<any>({ count: 1 })),
+    update: mock((..._args: any[]) => Promise.resolve<any>({ id: 'test-id' })),
+    updateMany: mock((..._args: any[]) => Promise.resolve<any>({ count: 1 })),
+    delete: mock((..._args: any[]) => Promise.resolve<any>({ id: 'test-id' })),
+    deleteMany: mock((..._args: any[]) => Promise.resolve<any>({ count: 1 })),
+    count: mock((..._args: any[]) => Promise.resolve<any>(0)),
+    aggregate: mock((..._args: any[]) => Promise.resolve<any>({ _sum: { total: null, amount: null }, _count: { id: 0 } })),
+    upsert: mock((..._args: any[]) => Promise.resolve<any>({ id: 'test-id' })),
+    groupBy: mock((..._args: any[]) => Promise.resolve<any[]>([])),
 })
 
 export const mockPrisma = {
@@ -41,8 +41,8 @@ export const mockPrisma = {
     stockAdjustment: makeModel(),
     supplier: makeModel(),
     user: makeModel(),
-    $queryRaw: mock(() => Promise.resolve([])),
-    $executeRaw: mock(() => Promise.resolve(0)),
+    $queryRaw: mock((..._args: any[]) => Promise.resolve<any[]>([])),
+    $executeRaw: mock((..._args: any[]) => Promise.resolve<any>(0)),
     $transaction: mock((fn: any) =>
         typeof fn === 'function' ? Promise.resolve(fn(mockPrisma)) : Promise.resolve([])
     ),
@@ -54,7 +54,7 @@ mock.module('@/lib/prisma', () => ({ default: mockPrisma }))
 // Replace the real Resend client so invite tests never hit the network
 export const mockResend = {
     emails: {
-        send: mock(() => Promise.resolve({ data: { id: 'test-email-id' }, error: null })),
+        send: mock((..._args: any[]) => Promise.resolve<any>({ data: { id: 'test-email-id' }, error: null })),
     },
 }
 mock.module('@/lib/resend', () => ({ resend: mockResend }))
