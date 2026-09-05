@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { flattenCategories } from "@/lib/utils";
-import { useDeleteData, useGetData } from "@/lib/api-request";
+import { useDeleteData, useGetData, useListData } from "@/lib/api-request";
 import { ProductModal } from "@/components/product-model";
 import type {
   BasicDataResponse,
@@ -30,7 +30,7 @@ import type {
 } from "@/types";
 import { DeleteItemModal } from "@/components/delete-item-model";
 import { toast } from "sonner";
-import { StatusBadge } from "@/lib/utils";
+import { StatusBadge } from "@/components/status-badge";
 import { useLocation } from "wouter";
 import { useDebounce } from "@/hooks/useDebounce";
 import Pagination from "../pagination";
@@ -71,7 +71,7 @@ export default function ProductSection({
     data: productData,
     refetch: refetchProducts,
     isFetching,
-  } = useGetData<TableResponse<ProductTableRow>>(
+  } = useListData<TableResponse<ProductTableRow>>(
     `/products/get/all?${productQuery}`,
     [
       debouncedSearch,
@@ -171,12 +171,21 @@ export default function ProductSection({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               placeholder="Search name..."
               className="pl-9 h-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter as any}>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => {
+              setStatusFilter(v as ProductStatus | "ALL");
+              setPage(1);
+            }}
+          >
             <SelectTrigger className="h-9 w-40">
               <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
               <SelectValue />

@@ -13,7 +13,7 @@ import {
 
 import { Link } from "wouter";
 import PurchaseHistory from "@/components/purchases/purchase-history";
-import { useDeleteData, useGetData } from "@/lib/api-request";
+import { useDeleteData, useGetData, useListData } from "@/lib/api-request";
 import type {
   OverviewStats,
   PurchaseHistory as PurchaseHistoryType,
@@ -38,8 +38,12 @@ export default function PurchasesPage() {
     data: purchases,
     isFetching,
     refetch: refetchPurchases,
-  } = useGetData<TableResponse<PurchaseHistoryType>>(
-    `/purchase/get/history?search=${debouncedQuery}&page=${page}&limit=${limit}`,
+  } = useListData<TableResponse<PurchaseHistoryType>>(
+    `/purchase/get/history?${new URLSearchParams({
+      search: debouncedQuery,
+      page: String(page),
+      limit: String(limit),
+    })}`,
     [debouncedQuery, page.toString(), limit.toString()],
   );
   const { data: overviewKpis, refetch: refetchOverviewKpis } = useGetData<{
@@ -183,7 +187,10 @@ export default function PurchasesPage() {
                     <Input
                       placeholder="Search orders..."
                       value={query}
-                      onChange={(e) => setQuery(e.target.value)}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
+                        setPage(1);
+                      }}
                       className="pl-10"
                     />
                   </div>

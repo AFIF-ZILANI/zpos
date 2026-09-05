@@ -24,7 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-import { server_URI, useGetData, usePostData } from "@/lib/api-request";
+import { server_URI, useListData, usePostData } from "@/lib/api-request";
 import type {
   CartEntryProduct,
   CheckoutPayload,
@@ -78,22 +78,15 @@ async function getCartItemByProductId(
 ): Promise<CartEntryProduct | null> {
   try {
     const token = await getToken();
-    // Fetch product to get the single variant's ID
-    const prodRes = await fetch(`${server_URI}/products/get/${productId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!prodRes.ok) return null;
-    const prodJson: { data: { variants: { id: string }[] } } = await prodRes.json();
-    const variantId = prodJson.data?.variants?.[0]?.id;
-    if (!variantId) return null;
-
-    const cartRes = await fetch(
-      `${server_URI}/products/get/variants/${variantId}/cart-item`,
+    // One round-trip: the server resolves the product's variant and returns the
+    // cart entry. This used to be two sequential requests per tap.
+    const res = await fetch(
+      `${server_URI}/products/get/${productId}/cart-item`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
-    if (!cartRes.ok) return null;
-    const cartJson: { data: CartEntryProduct } = await cartRes.json();
-    return cartJson.data ?? null;
+    if (!res.ok) return null;
+    const json: { data: CartEntryProduct } = await res.json();
+    return json.data ?? null;
   } catch {
     return null;
   }
@@ -175,7 +168,7 @@ export default function PointOfSale() {
     refetch: refetchProducts,
     isFetching: isFetchingProducts,
     isError: isProductsError,
-  } = useGetData<TableResponse<ProductTableRow>>(
+  } = useListData<TableResponse<ProductTableRow>>(
     `/products/get/all?${productQuery}`,
   );
 

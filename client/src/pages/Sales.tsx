@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, lazy, Suspense } from "react";
 // import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDateFilter } from "@/hooks/useDateFilter";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -15,11 +15,32 @@ import type {
 import { TopBar } from "@/components/sales/TopBar";
 import { StatCards } from "@/components/sales/SalesStats";
 import { UrgentTable } from "@/components/sales/UrgentTable";
-import { OrderStatusChart } from "@/components/sales/OrderStatusChart";
+// Recharts is loaded on demand — the sales table and KPI row should not wait
+// on a ~400 kB charting library to paint.
+/** Card-shaped placeholder shown while the chart chunk downloads. */
+function OrderStatusChartSkeleton() {
+  return (
+    <div className="rounded-xl border border-border bg-card">
+      <div className="p-6 pb-2">
+        <div className="text-lg font-semibold">Order Status</div>
+      </div>
+      <div className="p-6 pt-0 flex items-center justify-center h-80">
+        <div className="w-64 h-64 rounded-full bg-muted animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
+const OrderStatusChart = lazy(() =>
+  import("@/components/sales/OrderStatusChart").then((m) => ({
+    default: m.OrderStatusChart,
+  })),
+);
 import { SalesHistoryTable } from "@/components/sales/SaleHistoryTable";
+import { SaleDetailModal } from "@/components/sales/SaleDetailModal";
 import CollectPaymentModal from "@/components/sales/CollectPaymentModal";
 // import { DeleteConfirmationModal } from "@/components/sales/DeleteConformationModal";
-import { useGetData, usePostData } from "@/lib/api-request";
+import { useGetData, useListData, usePostData } from "@/lib/api-request";
 import { toast } from "sonner";
 
 // const COLORS = {
@@ -55,6 +76,7 @@ export default function SalesPage() {
   // State for modals
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   // const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   // State for history filters
@@ -95,12 +117,10 @@ export default function SalesPage() {
     data: urgentData,
     isFetching: urgentFetching,
     refetch: refetchUrgent,
-  } = useGetData<{
+  } = useListData<{
     data: {
       data: Sale[];
-    };
-    pagination: {
-      totalPages: number;
+      pagination: { totalPages: number };
     };
   }>(`/sales/get/all?${urgentQuery}`, [
     "sales",
@@ -124,6 +144,7 @@ export default function SalesPage() {
     from: dateFilter.from,
     to: dateFilter.to,
     page: String(historyPage),
+    limit: String(historyPageSize),
     search: debouncedSearch,
     status: historyStatus,
   });
@@ -132,12 +153,10 @@ export default function SalesPage() {
     data: historyData,
     isFetching: historyFetching,
     refetch: refetchHistory,
-  } = useGetData<{
+  } = useListData<{
     data: {
       data: Sale[];
-    };
-    pagination: {
-      totalPages: number;
+      pagination: { totalPages: number };
     };
   }>(`/sales/get/all?${historyQuery}`, [
     "sales",
@@ -147,6 +166,7 @@ export default function SalesPage() {
     debouncedSearch,
     historyStatus,
     historyPage.toString(),
+    historyPageSize.toString(),
   ]);
 
   const stats: SaleMetrics = statsData?.data || {
@@ -157,6 +177,8 @@ export default function SalesPage() {
   };
   const urgent = urgentData?.data.data || [];
   const historyItems = historyData?.data.data || [];
+  const historyTotalPages = historyData?.data.pagination?.totalPages ?? 1;
+  const urgentTotalPages = urgentData?.data.pagination?.totalPages ?? 1;
 
   // Mutations
 
@@ -265,7 +287,7 @@ export default function SalesPage() {
             sales={urgent}
             page={urgentPage}
             limit={urgentPageSize}
-            totalPages={1}
+            totalPages={urgentTotalPages}
             onPageChange={setUrgentPage}
             onLimitChange={setUrgentPageSize}
             isLoading={urgentFetching}
@@ -274,17 +296,19 @@ export default function SalesPage() {
         </div>
 
         {/* Order Status Chart */}
-        <OrderStatusChart
-          data={chartData?.data.data}
-          total={chartData?.data.total}
-          isLoading={chartFetching}
-        />
+        <Suspense fallback={<OrderStatusChartSkeleton />}>
+          <OrderStatusChart
+            data={chartData?.data.data}
+            total={chartData?.data.total}
+            isLoading={chartFetching}
+          />
+        </Suspense>
       </div>
 
       {/* Sales History Table */}
       <SalesHistoryTable
         sales={historyItems}
-        totalPages={1}
+        totalPages={historyTotalPages}
         page={historyPage}
         limit={historyPageSize}
         onLimitChange={(limit) => {
@@ -302,8 +326,8 @@ export default function SalesPage() {
         }}
         onExport={handleExport}
         onView={(sale) => {
-          // TODO: Open detail view
-          toast.success(`Viewing ${sale.invoiceNumber}`);
+          setSelectedSale(sale);
+          setIsDetailModalOpen(true);
         }}
         onDelete={handleDelete}
         currentSearch={historySearch}
@@ -311,6 +335,11 @@ export default function SalesPage() {
       />
 
       {/* Modals */}
+      <SaleDetailModal
+        sale={selectedSale}
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+      />
       <CollectPaymentModal
         invoiceNo={selectedSale?.invoiceNumber ?? ""}
         open={isPaymentModalOpen}

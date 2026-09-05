@@ -1,5 +1,10 @@
 import { useAuth } from "@clerk/react";
-import { useQuery, useMutation, type UseQueryOptions } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  keepPreviousData,
+  type UseQueryOptions,
+} from "@tanstack/react-query";
 
 
 /**
@@ -87,6 +92,26 @@ export function useGetData<T>(
     staleTime: 1000 * 30, // 30s — POS data changes frequently
     ...options,           // caller can still override if needed
   });
+}
+
+/**
+ * Same as {@link useGetData}, but keeps the previous page's data on screen
+ * while the next one loads.
+ *
+ * Without this, every page change, filter toggle and debounced keystroke
+ * unmounted the table and replaced it with a skeleton, so a search felt like it
+ * was reloading the whole screen on each character. The request cost is
+ * identical — only the perceived latency changes.
+ */
+export function useListData<T>(
+  endpoint: string,
+  queryKey?: string[],
+  options?: Omit<UseQueryOptions<T>, "queryKey" | "queryFn">
+) {
+  return useGetData<T>(endpoint, queryKey, {
+    placeholderData: keepPreviousData,
+    ...options,
+  } as Omit<UseQueryOptions<T>, "queryKey" | "queryFn">);
 }
 
 /* ------------------------- MUTATIONS ------------------------- */

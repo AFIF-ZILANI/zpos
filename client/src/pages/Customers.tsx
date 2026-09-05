@@ -13,10 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   useGetData,
+  useListData,
   usePatchData,
   usePostData,
   usePutData,
 } from "@/lib/api-request";
+import { useDebounce } from "@/hooks/useDebounce";
 import type {
   BasicDataResponse,
   CustomerStats,
@@ -50,12 +52,23 @@ export default function Customers() {
     useState<UpdateCustomer | null>(null);
 
   // ------ Fetch Data ------
+  // Search was previously fed straight into the query key, so every keystroke
+  // fired a request. Debounced to match the other list screens.
+  const debouncedSearch = useDebounce(search, 300);
+
   const {
     data: customerData,
     isFetching: isCustomerFetching,
     refetch: refetchCustomers,
-  } = useGetData<TableResponse<CustomerTableData>>(
-    `/customers/get/all?page=${page}&limit=${pageSize}&search=${search}&status=${statusFilter}`,
+  } = useListData<TableResponse<CustomerTableData>>(
+    // URLSearchParams, not interpolation — an unencoded "&" or "#" in the
+    // search box otherwise corrupts the query string.
+    `/customers/get/all?${new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+      search: debouncedSearch,
+      status: statusFilter,
+    })}`,
   );
   const { data: customerStatsData, refetch: refetchCustomerStats } = useGetData<
     BasicDataResponse<CustomerStats>
@@ -194,7 +207,12 @@ export default function Customers() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              // Without this a search started from page 2+ asks the server for
+              // page 2 of the new, shorter result set and renders an empty table.
+              setPage(1);
+            }}
             placeholder="Search by name or email..."
             className="pl-9 h-9"
           />
@@ -203,7 +221,10 @@ export default function Customers() {
           {(["ALL", "ACTIVE", "INACTIVE"] as const).map((s) => (
             <button
               key={s}
-              onClick={() => setStatusFilter(s)}
+              onClick={() => {
+                setStatusFilter(s);
+                setPage(1);
+              }}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-all capitalize ${statusFilter === s ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               {s}
