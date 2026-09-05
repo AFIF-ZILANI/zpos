@@ -373,10 +373,15 @@ export const SaleController = {
             //     prior ::uuid cast compared a uuid against a text column, which
             //     is what caused "operator does not exist".
             const lockedVariants = await tx.$queryRaw<
-                Array<{ id: string; name: string | null; product_name: string }>
+                Array<{
+                    id: string;
+                    name: string | null;
+                    product_name: string;
+                    stock_on_hand: number;
+                }>
             >(
                 Prisma.sql`
-                    SELECT pv.id, pv.name, p.name AS product_name
+                    SELECT pv.id, pv.name, pv.stock_on_hand, p.name AS product_name
                     FROM product_variants pv
                     JOIN products p ON p.id = pv.product_id
                     WHERE pv.id IN (${Prisma.join(variantIds)})
@@ -392,20 +397,10 @@ export const SaleController = {
                 lockedVariants.map((v) => [v.id, { name: v.name, productName: v.product_name }])
             );
 
-            // 6b. Read current stock balances — inside the lock, authoritative
-            const latestLedgerEntries = await tx.$queryRaw<
-                Array<{ variant_id: string; balance_after: number }>
-            >(
-                Prisma.sql`
-                    SELECT DISTINCT ON (variant_id) variant_id, balance_after
-                    FROM stock_ledgers
-                    WHERE variant_id IN (${Prisma.join(variantIds)})
-                    ORDER BY variant_id, created_at DESC
-                `
-            );
-
+            // 6b. Current stock comes back with the lock above — the row we
+            //     already hold is authoritative, so there is no second query.
             const stockMap = new Map(
-                latestLedgerEntries.map((e) => [e.variant_id, Number(e.balance_after)])
+                lockedVariants.map((v) => [v.id, Number(v.stock_on_hand)])
             );
 
             // 6c. Validate stock
@@ -477,6 +472,18 @@ export const SaleController = {
                     sale_id: newSale.id,
                 })),
             });
+
+            // 6g. Keep the denormalized stock column in step with the ledger.
+            //     Same transaction, same FOR UPDATE lock taken in 6a, so the
+            //     two can never diverge.
+            await Promise.all(
+                [...qtyByVariantId.entries()].map(([variantId, qty]) =>
+                    tx.productVariant.update({
+                        where: { id: variantId },
+                        data: { stock_on_hand: { decrement: qty } },
+                    })
+                )
+            );
 
             // Return invoice number so it can be sent back in the response
             return newSale;

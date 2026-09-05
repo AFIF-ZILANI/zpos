@@ -6,6 +6,7 @@ import type { InviteInput, UpdateInput } from "@myapp/shared/schemas/admin.schem
 import type { IdBody } from "@myapp/shared/schemas/helper";
 import { InviteStatus } from "generated/prisma";
 import { sendInviteEmail } from "@/services/invite.service";
+import { invalidateUserById } from "@/lib/session-cache";
 
 
 export const AdminController = {
@@ -83,12 +84,20 @@ export const AdminController = {
             data: body,
         });
 
+        // Role and is_active are cached per session — drop the entry so the
+        // change applies to the very next request instead of after the TTL.
+        invalidateUserById(body.id);
+
         return sendSuccess(c, {}, "User updated", 200);
     },
 
     // DELETE /api/admin/:id — deactivate (soft delete)
     async remove(c: Context<AppEnv>) {
         const id = c.req.param("id");
+
+        if (!id) {
+            return sendError(c, "User ID is required", "BAD_REQUEST", 400);
+        }
 
         if (id === c.get("userId")) {
             return sendError(c, "You cannot deactivate yourself", "FORBIDDEN", 403);
@@ -107,6 +116,8 @@ export const AdminController = {
             where: { id },
             data: { is_active: false },
         });
+
+        invalidateUserById(id);
 
         return sendSuccess(c, null, "User deactivated", 200);
     },
@@ -127,6 +138,8 @@ export const AdminController = {
             where: { id },
             data: { status: InviteStatus.CANCELLED },
         });
+
+        invalidateUserById(id);
 
         return sendSuccess(c, null, "Invitation cancelled", 200);
     },

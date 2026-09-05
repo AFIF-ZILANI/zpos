@@ -31,21 +31,17 @@ export const ProductService = {
                 ? Prisma.sql`AND computed_status = ${status}`
                 : Prisma.empty;
 
+        // Stock comes from the denormalized product_variants.stock_on_hand
+        // column, kept in sync with the ledger on every write. Deriving it here
+        // with DISTINCT ON over stock_ledgers meant scanning every stock
+        // movement ever recorded on each keystroke of a POS search.
         const rows = await tx.$queryRaw<ProductRow[]>(Prisma.sql`
-        WITH variant_stock AS (
-            SELECT DISTINCT ON (variant_id)
-                variant_id,
-                balance_after AS stock
-            FROM stock_ledgers
-            ORDER BY variant_id, created_at DESC
-        ),
-        product_stock AS (
+        WITH product_stock AS (
             SELECT
                 pv.product_id,
-                COALESCE(SUM(vs.stock), 0)::INT AS total_stock,
-                COUNT(pv.id)::INT               AS total_variants
+                COALESCE(SUM(pv.stock_on_hand), 0)::INT AS total_stock,
+                COUNT(pv.id)::INT                       AS total_variants
             FROM product_variants pv
-            LEFT JOIN variant_stock vs ON vs.variant_id = pv.id
             WHERE pv.is_active = true
             GROUP BY pv.product_id
         ),

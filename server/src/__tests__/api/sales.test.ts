@@ -205,10 +205,11 @@ describe('POST /api/sales/create', () => {
 
     it('rejects checkout when requested quantity exceeds locked stock', async () => {
         mockHappyPathUpToLock()
-        // 6a: lock query, 6b: balance read — both go through tx.$queryRaw
-        mockPrisma.$queryRaw
-            .mockResolvedValueOnce([{ id: VARIANT_ID, name: 'Red', product_name: 'T-Shirt' }])
-            .mockResolvedValueOnce([{ variant_id: VARIANT_ID, balance_after: 1 }]) // only 1 in stock, cart wants 2
+        // 6a: the FOR UPDATE lock returns the authoritative stock alongside the
+        // variant metadata, so there is no separate balance query.
+        mockPrisma.$queryRaw.mockResolvedValueOnce([
+            { id: VARIANT_ID, name: 'Red', product_name: 'T-Shirt', stock_on_hand: 1 }, // only 1 in stock, cart wants 2
+        ])
 
         const res = await post(app, '/api/sales/create', VALID_CHECKOUT_BODY)
         expect(res.status).toBe(422)
@@ -233,9 +234,9 @@ describe('POST /api/sales/create', () => {
 
     it('creates a sale and a matching stock ledger entry on the happy path', async () => {
         mockHappyPathUpToLock()
-        mockPrisma.$queryRaw
-            .mockResolvedValueOnce([{ id: VARIANT_ID, name: 'Red', product_name: 'T-Shirt' }])
-            .mockResolvedValueOnce([{ variant_id: VARIANT_ID, balance_after: 10 }])
+        mockPrisma.$queryRaw.mockResolvedValueOnce([
+            { id: VARIANT_ID, name: 'Red', product_name: 'T-Shirt', stock_on_hand: 10 },
+        ])
         mockPrisma.counter.update.mockResolvedValueOnce({ key: 'invoice', value: 42 })
         mockPrisma.sale.create.mockResolvedValueOnce({ id: 'sale-1', invoice_number: 'INV-2026-000042' })
 
@@ -249,6 +250,13 @@ describe('POST /api/sales/create', () => {
         const ledgerCall = mockPrisma.stockLedger.createMany.mock.calls[0]?.[0].data
         expect(ledgerCall[0].quantity).toBe(2)
         expect(ledgerCall[0].balance_after).toBe(8) // 10 in stock - 2 sold
+
+        // The denormalized column must be decremented in the same transaction,
+        // otherwise it drifts from the ledger.
+        expect(mockPrisma.productVariant.update.mock.calls[0]?.[0]).toEqual({
+            where: { id: VARIANT_ID },
+            data: { stock_on_hand: { decrement: 2 } },
+        })
     })
 })
 

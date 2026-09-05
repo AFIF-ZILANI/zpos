@@ -167,14 +167,22 @@ export const ProductController = {
         return sendSuccess(c, {}, "Product deleted successfully", 200);
     },
     async getPurchaseData(c: Context) {
+        // Only the three fields below are rendered, so select rather than
+        // include — this used to hydrate every column of every variant, product
+        // and category row in the database on each page load.
         const productVariants = await prisma.productVariant.findMany({
-            include: {
+            where: { is_active: true, product: { is_active: true } },
+            select: {
+                id: true,
+                name: true,
                 product: {
-                    include: {
-                        category: true,
-                    }
-                }
+                    select: {
+                        name: true,
+                        category: { select: { name: true } },
+                    },
+                },
             },
+            orderBy: { product: { name: "asc" } },
         });
 
         const formattedProducts = productVariants.map((v) => ({
@@ -207,13 +215,11 @@ export const ProductController = {
             include: {
                 purchaseItem: { select: { sell_price: true } },
                 variant: {
-                    include: {
-                        product: true,
-                        stockLedgers: {
-                            orderBy: { created_at: "desc" },
-                            take: 1,
-                            select: { balance_after: true },
-                        },
+                    select: {
+                        id: true,
+                        name: true,
+                        stock_on_hand: true,
+                        product: { select: { name: true } },
                     },
                 },
             },
@@ -229,9 +235,55 @@ export const ProductController = {
             name: `${variant.product.name}${variant.name ? ` - ${variant.name}` : ""}`,
             price: Number(purchaseItem.sell_price),
             barcode: barcodeData.code,
-            availableStock: variant.stockLedgers[0]?.balance_after ?? 0,
+            availableStock: variant.stock_on_hand,
         };
         return sendSuccess(c, result, "Variant fetched successfully", 200);
+    },
+
+    /**
+     * Resolve a product straight to its cart entry.
+     *
+     * The POS previously did this in two sequential round-trips: fetch the
+     * whole product to learn its first variant id, then fetch that variant's
+     * cart item. Every tap on a product in the grid paid for both.
+     */
+    async getCartItemByProduct(c: Context) {
+        const productId = c.req.param("id") ?? "";
+
+        const allocation = await prisma.variantBarcodeAllocation.findFirst({
+            where: {
+                variant: { product_id: productId, is_active: true },
+                barcode: { status: BarcodeStatus.ALLOCATED },
+            },
+            include: {
+                barcode: { select: { code: true } },
+                purchaseItem: { select: { sell_price: true } },
+                variant: {
+                    select: {
+                        id: true,
+                        name: true,
+                        stock_on_hand: true,
+                        product: { select: { name: true } },
+                    },
+                },
+            },
+        });
+
+        if (!allocation) {
+            return sendError(c, "No active stock for this product", "NOT_FOUND", 404);
+        }
+
+        const { variant, purchaseItem, barcode } = allocation;
+
+        const result: CartEntryProduct = {
+            variantId: variant.id,
+            name: `${variant.product.name}${variant.name ? ` - ${variant.name}` : ""}`,
+            price: Number(purchaseItem.sell_price),
+            barcode: barcode.code,
+            availableStock: variant.stock_on_hand,
+        };
+
+        return sendSuccess(c, result, "Product cart item fetched successfully", 200);
     },
 
     async getCartItemByVariant(c: Context) {
@@ -246,13 +298,11 @@ export const ProductController = {
                 barcode: true,
                 purchaseItem: { select: { sell_price: true } },
                 variant: {
-                    include: {
-                        product: true,
-                        stockLedgers: {
-                            orderBy: { created_at: "desc" },
-                            take: 1,
-                            select: { balance_after: true },
-                        },
+                    select: {
+                        id: true,
+                        name: true,
+                        stock_on_hand: true,
+                        product: { select: { name: true } },
                     },
                 },
             },
@@ -263,7 +313,7 @@ export const ProductController = {
         }
 
         const { variant, purchaseItem, barcode } = allocation;
-        const availableStock = variant.stockLedgers[0]?.balance_after ?? 0;
+        const availableStock = variant.stock_on_hand;
 
         const result: CartEntryProduct = {
             variantId: variant.id,
@@ -391,29 +441,14 @@ export const ProductController = {
                 total_out_of_stock: number
             }[]
         >`
-        WITH latest_stock AS (
-            SELECT DISTINCT ON (variant_id)
-                variant_id,
-                balance_after
-            FROM stock_ledgers
-            ORDER BY variant_id, created_at DESC
-        ),
-        variant_stock AS (
-            SELECT
-                pv.id,
-                pv.product_id,
-                COALESCE(ls.balance_after,0) AS stock
-            FROM product_variants pv
-            LEFT JOIN latest_stock ls ON ls.variant_id = pv.id
-            WHERE pv.is_active = true
-        ),
-        product_stock AS (
+        WITH product_stock AS (
             SELECT
                 p.id,
                 p.reorder_level,
-                COALESCE(SUM(vs.stock),0) AS stock
+                COALESCE(SUM(pv.stock_on_hand),0) AS stock
             FROM products p
-            LEFT JOIN variant_stock vs ON vs.product_id = p.id
+            LEFT JOIN product_variants pv
+                   ON pv.product_id = p.id AND pv.is_active = true
             WHERE p.is_active = true
             GROUP BY p.id
         )

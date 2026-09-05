@@ -238,7 +238,6 @@ export const DashboardController = {
 
     const row = rows[0];
 
-    console.log("[rows]", row);
 
 
 
@@ -405,7 +404,6 @@ export const DashboardController = {
   GROUP BY category_name
   ORDER BY category_revenue DESC
 `;
-    console.log("Category sales", rows)
     if (rows.length === 0) {
       return sendSuccess(c, [], "No sales data for this period", 200);
     }

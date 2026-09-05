@@ -158,6 +158,16 @@ model ProductVariant {
   size       String?
   is_active  Boolean @default(true)
 
+  // Denormalized running stock, kept in sync with StockLedger inside the same
+  // transaction as every ledger write (and under the same `FOR UPDATE` lock on
+  // this row). The ledger stays the append-only source of truth for history;
+  // this column exists so reads don't have to scan it.
+  //
+  // Deriving current stock used to require a `DISTINCT ON (variant_id)` over
+  // the whole stock_ledgers table on every product list, POS search and stats
+  // call — an O(all movements ever) scan on the hottest read path in the app.
+  stock_on_hand Int @default(0)
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -170,6 +180,7 @@ model ProductVariant {
   variantBarcodeAllocations VariantBarcodeAllocation[]
 
   @@index([product_id])
+  @@index([product_id, is_active])
   @@map("product_variants")
 }
 
@@ -333,6 +344,11 @@ model Sale {
   @@index([status])
   @@index([invoice_number])
   @@index([invoiced_at, status])
+  // Every dashboard panel filters on created_at (not invoiced_at) plus status.
+  // Without these, each of the six dashboard requests sequentially scanned the
+  // whole sales table on every page load.
+  @@index([created_at])
+  @@index([status, created_at])
   @@map("sales")
 }
 

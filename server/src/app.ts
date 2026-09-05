@@ -5,6 +5,7 @@ import { secureHeaders } from 'hono/secure-headers'
 import { timeout } from 'hono/timeout'
 import { rateLimiter } from 'hono-rate-limiter'
 import { csrf } from 'hono/csrf'
+import { compress } from 'hono/compress'
 import { HTTPException } from 'hono/http-exception'
 import { AppError } from '@/utils/AppError'
 import { sendError, sendSuccess } from '@/utils/response'
@@ -61,19 +62,39 @@ app.use('*', cors({
     maxAge: 86400,
 }))
 
+// --- Response compression ---
+// API payloads are JSON (product lists, sales history, dashboard series) and
+// compress by roughly 5-10x. This is the single biggest transfer-size win on
+// slow connections.
+app.use('*', compress())
+
 // --- Timeout ---
 app.use('*', timeout(30_000))
 
 // --- Rate Limiting ---
+// Keyed per credential when one is present, falling back to IP. Keying on IP
+// alone meant every till in a shop shared a single bucket behind one NAT — a
+// busy counter plus a dashboard refresh could exhaust it and start failing real
+// requests. The limit is also sized for POS traffic: a scan-heavy checkout
+// legitimately issues a burst of calls.
 app.use('*', rateLimiter({
     windowMs: 60_000,
-    limit: 120,
-    keyGenerator: (c) =>
-        c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown',
+    limit: Number(process.env.RATE_LIMIT_PER_MINUTE ?? 600),
+    keyGenerator: (c) => {
+        const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+        const auth = c.req.header('Authorization')
+        // The token tail is stable per session and never logged; it just
+        // separates concurrent users sharing an egress IP.
+        return auth ? `t:${auth.slice(-32)}` : `ip:${ip}`
+    },
 }))
 
 // --- Logging ---
-app.use('*', logger())
+// Per-request console I/O is synchronous and shows up under load, so keep the
+// verbose logger to development only.
+if (isDev) {
+    app.use('*', logger())
+}
 
 // --- Public routes (no auth required) ---
 app.get('/health', (c) =>

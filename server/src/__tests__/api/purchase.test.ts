@@ -39,11 +39,14 @@ describe('POST /api/purchase/create', () => {
             ])
         mockPrisma.supplier.upsert.mockResolvedValueOnce({ id: 'sup-1' })
         mockPrisma.purchase.create.mockResolvedValueOnce({ id: PURCHASE_ID })
-        mockPrisma.stockLedger.findMany.mockResolvedValueOnce([]) // no prior stock
         mockPrisma.purchaseItem.findMany.mockResolvedValueOnce([
             { id: 'pi-1', variant_id: VARIANT_ID, quantity: 2 },
         ])
-        mockPrisma.$queryRaw.mockResolvedValueOnce([{ serial: 1001 }])
+        mockPrisma.$queryRaw
+            // 6. FOR UPDATE lock, which also carries current stock
+            .mockResolvedValueOnce([{ id: VARIANT_ID, stock_on_hand: 0 }])
+            // 8. barcode serial reservation
+            .mockResolvedValueOnce([{ serial: 1001 }])
 
         const expectedCode = generateEAN13(1001)
         mockPrisma.barcode.findMany.mockResolvedValueOnce([
@@ -60,6 +63,14 @@ describe('POST /api/purchase/create', () => {
 
         // The serial must come from the reserved sequence, not a manual increment
         expect(mockPrisma.barcode.createMany.mock.calls[0]?.[0].data[0].serial).toBe(1001)
+
+        // Ledger and the denormalized stock column must move together
+        const ledgerRow = mockPrisma.stockLedger.createMany.mock.calls[0]?.[0].data[0]
+        expect(ledgerRow.balance_after).toBe(2) // 0 on hand + 2 purchased
+        expect(mockPrisma.productVariant.update.mock.calls[0]?.[0]).toEqual({
+            where: { id: VARIANT_ID },
+            data: { stock_on_hand: { increment: 2 } },
+        })
     })
 
     it('fails the whole transaction when a variant id does not exist', async () => {

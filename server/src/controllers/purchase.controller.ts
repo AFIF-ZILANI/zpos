@@ -77,16 +77,23 @@ export const PurchaseController = {
                 })),
             });
 
-            // 6. Fetch latest stock balance per variant (one query)
-            const latestBalances = await tx.stockLedger.findMany({
-                where: { variant_id: { in: variantIds } },
-                orderBy: { created_at: "desc" },
-                distinct: ["variant_id"],
-                select: { variant_id: true, balance_after: true },
-            });
+            // 6. Lock the variant rows and read current stock from them. The
+            //    lock serializes concurrent stock writes for these variants
+            //    (the same discipline the sale path uses), and the denormalized
+            //    column removes the ledger scan this used to do.
+            const lockedVariants = await tx.$queryRaw<
+                Array<{ id: string; stock_on_hand: number }>
+            >(
+                Prisma.sql`
+                    SELECT id, stock_on_hand
+                    FROM product_variants
+                    WHERE id IN (${Prisma.join(variantIds)})
+                    FOR UPDATE
+                `
+            );
 
             const balanceMap = new Map(
-                latestBalances.map((b) => [b.variant_id, b.balance_after])
+                lockedVariants.map((v) => [v.id, Number(v.stock_on_hand)])
             );
 
             // 7. Create stock ledger entries
@@ -100,6 +107,16 @@ export const PurchaseController = {
                     balance_after: (balanceMap.get(v.variantId) ?? 0) + (Number(v.quantity) ?? 0),
                 })),
             });
+
+            // 7b. Keep the denormalized stock column in step with the ledger.
+            await Promise.all(
+                variants.map((v) =>
+                    tx.productVariant.update({
+                        where: { id: v.variantId },
+                        data: { stock_on_hand: { increment: Number(v.quantity) ?? 0 } },
+                    })
+                )
+            );
 
             // 8. Barcode generation + allocation
 
@@ -351,22 +368,48 @@ export const PurchaseController = {
             // entries on the affected variants — later entries (e.g. a
             // subsequent purchase) were computed as a running sum that
             // included this purchase's quantity, so they're now stale.
-            for (const variantId of new Set(variantIds)) {
-                const remaining = await tx.stockLedger.findMany({
-                    where: { variant_id: variantId },
-                    orderBy: { created_at: "asc" },
-                });
+            const affectedVariantIds = [...new Set(variantIds)];
 
-                let running = 0;
-                for (const entry of remaining) {
-                    running += entry.direction === StockDirection.IN ? entry.quantity : -entry.quantity;
-                    if (entry.balance_after !== running) {
-                        await tx.stockLedger.update({
-                            where: { id: entry.id },
-                            data: { balance_after: running },
-                        });
-                    }
-                }
+            if (affectedVariantIds.length > 0) {
+                // Recompute the running balance in a single set-based statement
+                // per batch rather than one UPDATE per ledger row, which was an
+                // N+1 write that grew with a variant's entire history.
+                await tx.$executeRaw(Prisma.sql`
+                    WITH recomputed AS (
+                        SELECT
+                            id,
+                            SUM(CASE WHEN direction = 'IN' THEN quantity ELSE -quantity END)
+                                OVER (PARTITION BY variant_id ORDER BY created_at, id)::INT
+                                AS running_balance
+                        FROM stock_ledgers
+                        WHERE variant_id IN (${Prisma.join(affectedVariantIds)})
+                    )
+                    UPDATE stock_ledgers sl
+                    SET balance_after = r.running_balance
+                    FROM recomputed r
+                    WHERE sl.id = r.id
+                      AND sl.balance_after IS DISTINCT FROM r.running_balance
+                `);
+
+                // 4c. Re-derive the denormalized stock column for the affected
+                // variants from the (now corrected) ledger tail.
+                await tx.$executeRaw(Prisma.sql`
+                    UPDATE product_variants pv
+                    SET stock_on_hand = COALESCE(ls.balance_after, 0)
+                    FROM (
+                        SELECT v.id AS variant_id, l.balance_after
+                        FROM product_variants v
+                        LEFT JOIN LATERAL (
+                            SELECT balance_after
+                            FROM stock_ledgers
+                            WHERE variant_id = v.id
+                            ORDER BY created_at DESC, id DESC
+                            LIMIT 1
+                        ) l ON TRUE
+                        WHERE v.id IN (${Prisma.join(affectedVariantIds)})
+                    ) ls
+                    WHERE pv.id = ls.variant_id
+                `);
             }
 
             // 5. Delete purchase items
