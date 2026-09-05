@@ -11,18 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  BarChart,
-  Bar,
-  Cell,
-  LabelList,
-} from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { lazy, Suspense } from "react";
 import { useGetData } from "@/lib/api-request";
 import type {
   CategorySalesEntry,
@@ -32,21 +21,22 @@ import type {
   TopProductEntry,
   WeeklySalesEntry,
 } from "@/types";
-import { formatCurrencyInBDT, StatusBadgeSales } from "@/lib/utils";
+import { formatCurrencyInBDT } from "@/lib/utils";
+import { StatusBadgeSales } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "date-fns";
 
-const weeklySalesChartConfig = {
-  sales: { label: "Revenue", color: "hsl(var(--chart-1))" },
-} satisfies ChartConfig;
-
-const categoryChartColors = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
-];
+// Charts live in their own chunk — see components/dashboard/dashboard-charts.
+const WeeklySalesChart = lazy(() =>
+  import("@/components/dashboard/dashboard-charts").then((m) => ({
+    default: m.WeeklySalesChart,
+  })),
+);
+const CategoryBreakdownChart = lazy(() =>
+  import("@/components/dashboard/dashboard-charts").then((m) => ({
+    default: m.CategoryBreakdownChart,
+  })),
+);
 
 export default function Dashboard() {
   const { data: incomeStats } = useGetData<{
@@ -188,54 +178,9 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">New sales will appear here as they come in</p>
               </div>
             ) : (
-              <ChartContainer config={weeklySalesChartConfig} className="aspect-auto h-[220px] w-full">
-                <AreaChart
-                  data={weeklySalesGraphData}
-                  margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient
-                      id="salesGradient"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="hsl(var(--border))"
-                  />
-                  <XAxis
-                    dataKey="day"
-                    tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12, fontFamily: "var(--app-font-mono)", fill: "hsl(var(--muted-foreground))" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value) => formatCurrencyInBDT(Number(value))}
-                      />
-                    }
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="sales"
-                    stroke="hsl(var(--chart-1))"
-                    strokeWidth={2}
-                    fill="url(#salesGradient)"
-                  />
-                </AreaChart>
-              </ChartContainer>
+              <Suspense fallback={<Skeleton className="w-full h-[220px]" />}>
+                <WeeklySalesChart weeklySalesGraphData={weeklySalesGraphData} />
+              </Suspense>
             )}
           </CardContent>
         </Card>
@@ -264,43 +209,17 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground">No category sales yet</p>
               </div>
             ) : (
-              <ChartContainer
-                config={{}}
-                className="aspect-auto w-full"
-                style={{ height: categoryGraphData.length * 36 }}
-              >
-                <BarChart
-                  data={categoryGraphData}
-                  layout="vertical"
-                  margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
-                >
-                  <XAxis type="number" hide domain={[0, 100]} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tickLine={false}
-                    axisLine={false}
-                    width={100}
-                    tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
-                  />
-                  <ChartTooltip
-                    content={<ChartTooltipContent formatter={(value) => `${value}%`} />}
-                  />
-                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={16}>
-                    {categoryGraphData.map((_, i) => (
-                      <Cell key={i} fill={categoryChartColors[i % categoryChartColors.length]} />
+              <Suspense
+                fallback={
+                  <div className="space-y-3">
+                    {Array.from({ length: categoryGraphData.length }).map((_, i) => (
+                      <Skeleton key={i} className="w-full h-6" />
                     ))}
-                    <LabelList
-                      dataKey="value"
-                      position="right"
-                      formatter={(v: number) => `${v}%`}
-                      className="font-mono"
-                      fill="hsl(var(--foreground))"
-                      fontSize={12}
-                    />
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
+                  </div>
+                }
+              >
+                <CategoryBreakdownChart categoryGraphData={categoryGraphData} />
+              </Suspense>
             )}
           </CardContent>
         </Card>
